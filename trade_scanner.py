@@ -1125,16 +1125,28 @@ def main():
             r = scan_breakout(coin)
             risk_txt = {'HYPE': '0.1-0.15%', 'ZEC': '0.1% (эксперимент)'}.get(coin, '0.15-0.2%')
             if r.get('status') == 'СЕТАП АКТИВЕН':
-                msg = (f"{coin:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
-                       f"{r['exit_rule']} | риск {risk_txt}")
-                auto = ''
-                if state.get(f"{coin}:{r['side']}") != r['bar_ts'] and coin not in positions:
-                    positions[coin] = {'side': 'long' if r['side'] == 'ЛОНГ' else 'short',
-                                       'entry': r['entry'], 'entry_ts': r['bar_ts']}
-                    save_positions(positions)
-                    auto = ' Позиция взята на сопровождение (трейлинг автоматически).'
-                alerts.append((f"{coin}:{r['side']}", r['bar_ts'],
-                               f"{coin} {r['side']} (пробой 48h): вход {r['entry']:.2f}, SL {r['sl']:.2f}, дальше трейлинг.{auto}"))
+                sig_side = 'long' if r['side'] == 'ЛОНГ' else 'short'
+                pos = positions.get(coin)
+                if pos and pos['side'] == sig_side:
+                    # уже в позиции в ту же сторону: повторный пробой = подтверждение, НЕ доливка
+                    msg = f"{coin:7} в позиции ({r['side']}), повторный пробой подавлен - ведём трейлинг"
+                elif pos and pos['side'] != sig_side:
+                    # пробой ПРОТИВ открытой позиции - трейлинг скорее всего уже задет, но предупредим
+                    msg = f"{coin:7} !!! пробой ПРОТИВ позиции ({r['side']}) - проверь стоп немедленно"
+                    alerts.append((f"{coin}:reverse", r['bar_ts'],
+                                   f"⚠️ {coin}: пробой 48h ПРОТИВ твоей позиции ({pos['side']}). "
+                                   f"Трейлинг-стоп должен был сработать - проверь и закрой, если ещё нет."))
+                else:
+                    msg = (f"{coin:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
+                           f"{r['exit_rule']} | риск {risk_txt}")
+                    auto = ''
+                    if state.get(f"{coin}:{r['side']}") != r['bar_ts']:
+                        positions[coin] = {'side': sig_side,
+                                           'entry': r['entry'], 'entry_ts': r['bar_ts']}
+                        save_positions(positions)
+                        auto = ' Позиция взята на сопровождение (трейлинг автоматически).'
+                    alerts.append((f"{coin}:{r['side']}", r['bar_ts'],
+                                   f"{coin} {r['side']} (пробой 48h): вход {r['entry']:.2f}, SL {r['sl']:.2f}, дальше трейлинг.{auto}"))
             else:
                 msg = f"{coin:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
             lines.append(msg)

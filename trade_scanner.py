@@ -71,7 +71,7 @@ def fetch_hl_bars(coin, interval='1h', days=150, bar_sec=3600):
     return [b for b in bars if b[0] <= cutoff]
 
 
-HL_COINS = {'BTC', 'HYPE', 'ETH', 'SOL', 'ZEC'}
+HL_COINS = {'BTC', 'HYPE', 'ETH', 'SOL', 'ZEC', 'BNB'}
 
 
 def fetch_any(symbol, days=150, interval='1h', bar_sec=3600):
@@ -247,7 +247,7 @@ def scan_day_pullback(name, symbol, always_open):
 #   SOL  (2 года): PF 1.16/1.19, N=394  | откатная свинг-система на альтах НЕ работает (PF<1)
 # Риск: ETH/SOL 0.15-0.2% (2 года данных), HYPE 0.1-0.15% (13 мес).
 HYPE_LOOKBACK, HYPE_ATR_TRAIL, HYPE_TIME_STOP_H = 48, 2.5, 120
-CRYPTO_BREAKOUT = ['HYPE', 'ETH', 'SOL', 'ZEC']   # монеты Hyperliquid API; ZEC эксперимент (7 мес истории, PF 2.96)
+CRYPTO_BREAKOUT = ['HYPE', 'ETH', 'SOL', 'ZEC', 'BNB']   # ZEC эксперимент (7 мес, PF 2.96); BNB добавлен 15.07 (PF 1.14/1.43, 2 года)
 POSITIONS = Path(__file__).with_name('trade_positions.json')  # открытые позиции для ведения трейлинга
 
 

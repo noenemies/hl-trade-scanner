@@ -249,6 +249,49 @@ def scan_day_pullback(name, symbol, always_open):
 HYPE_LOOKBACK, HYPE_ATR_TRAIL, HYPE_TIME_STOP_H = 48, 2.5, 120
 CRYPTO_BREAKOUT = ['HYPE', 'ETH', 'SOL', 'ZEC', 'BNB']   # ZEC эксперимент (7 мес, PF 2.96); BNB добавлен 15.07 (PF 1.14/1.43, 2 года)
 POSITIONS = Path(__file__).with_name('trade_positions.json')  # открытые позиции для ведения трейлинга
+JOURNAL = Path(__file__).with_name('trade_journal.json')       # архив закрытых сделок для месячной статистики
+
+
+def journal_trade(coin, pos, r, reason):
+    try:
+        j = json.load(open(JOURNAL)) if JOURNAL.exists() else []
+    except Exception:
+        j = []
+    j.append({'coin': coin, 'side': pos['side'], 'entry': pos['entry'],
+              'opened_ts': pos['entry_ts'], 'closed_ts': dt.datetime.now().timestamp(),
+              'r': round(r, 2), 'reason': reason})
+    JOURNAL.write_text(json.dumps(j, indent=1))
+
+
+def monthly_report(state):
+    """Отчёт за прошлый месяц - шлётся с первой утренней сводкой нового месяца."""
+    today = dt.date.today()
+    tag = today.strftime('%Y-%m')
+    if state.get('monthly_report') == tag or not JOURNAL.exists():
+        return ''
+    prev_month = (today.replace(day=1) - dt.timedelta(days=1)).strftime('%Y-%m')
+    try:
+        j = json.load(open(JOURNAL))
+    except Exception:
+        return ''
+    rows = [t for t in j if dt.date.fromtimestamp(t['closed_ts']).strftime('%Y-%m') == prev_month]
+    state['monthly_report'] = tag
+    if not rows:
+        return f'\n\n📊 Отчёт за {prev_month}: закрытых сделок не было.'
+    by = {}
+    for t in rows:
+        by.setdefault(t['coin'], []).append(t['r'])
+    lines = [f'\n\n📊 Отчёт за {prev_month} ({len(rows)} сделок):']
+    for coin in sorted(by, key=lambda c: -sum(by[c])):
+        rs = by[coin]
+        plus = sum(1 for x in rs if x > 0); minus = len(rs) - plus
+        lines.append(f'  {coin}: {plus}+ / {minus}-  итог {sum(rs):+.1f}R')
+    allr = [t['r'] for t in rows]
+    wins = [x for x in allr if x > 0.05]; losses = [x for x in allr if x < -0.05]
+    pf = (sum(wins)/abs(sum(losses))) if losses else 99
+    lines.append(f'  ИТОГО: {sum(1 for x in allr if x>0)}+ / {sum(1 for x in allr if x<=0)}-, '
+                 f'{sum(allr):+.1f}R, PF {pf:.2f}, win rate {sum(1 for x in allr if x>0)/len(allr):.0%}')
+    return '\n'.join(lines)
 
 
 def load_positions():
@@ -1024,6 +1067,12 @@ def handle_position_cli():
         coin = sys.argv[sys.argv.index('--close')+1].upper()
         p = load_positions()
         if coin in p:
+            try:
+                st = trail_position(coin, p[coin])
+                journal_trade(coin, p[coin], st['r_now'], 'manual')
+                print(f'записано в журнал: {st["r_now"]:+.1f}R')
+            except Exception:
+                pass
             del p[coin]; save_positions(p)
             print(f'{coin} закрыт, трейлинг остановлен.')
         else:
@@ -1212,12 +1261,15 @@ def main():
                 alerts.append((f'trail-hit:{coin}', round(st['stop'], 4),
                                f"⛔ {coin} {side_ru}: стоп {st['stop']:.2f} задет — закрывай позицию. "
                                f"Снята со слежения автоматически."))
+                d = 1 if pos['side'] == 'long' else -1
+                journal_trade(coin, pos, d * (st['stop'] - pos['entry']) / st['risk'], 'stop')
                 del positions[coin]; save_positions(positions)
             elif st['event'] == 'time_stop':
                 msg = f"TRAIL   {coin} {side_ru}: ТАЙМ-СТОП {st['hours']:.0f}ч — закрыть по рынку ({st['r_now']:+.1f}R)"
                 alerts.append((f'trail-time:{coin}', int(st['hours'] // 24),
                                f"⏰ {coin} {side_ru}: 5 суток в позиции ({st['r_now']:+.1f}R) — тайм-стоп, закрывай по рынку. "
                                f"Снята со слежения автоматически."))
+                journal_trade(coin, pos, st['r_now'], 'time_stop')
                 del positions[coin]; save_positions(positions)
             else:
                 msg = (f"TRAIL   {coin} {side_ru} @ {pos['entry']:.2f} | стоп -> {st['stop']:.2f} | "
@@ -1266,7 +1318,7 @@ def main():
             senti += judgment_block(collect_sentiment_metrics())
         except Exception:
             pass
-        lt_note = longterm_thesis_reminder(state)
+        lt_note = monthly_report(state) + longterm_thesis_reminder(state)
         lt_note = hlp_status_line() + lt_note
         ok = send_telegram(f'📋 Утренняя сводка{late}\n' + report + cal + senti + spacex_events_block() + lt_note)
         if ok:

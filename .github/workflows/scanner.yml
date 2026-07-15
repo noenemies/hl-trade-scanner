@@ -1,0 +1,31 @@
+name: trade-scanner
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: scanner
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: America/Chicago
+      CI: "true"
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: run scanner
+        run: python3 trade_scanner.py --auto --quiet
+      - name: persist state
+        run: |
+          git config user.name "scanner-bot"
+          git config user.email "scanner@local"
+          git add -A -- '*.json' signals.log 2>/dev/null || true
+          git commit -m "state $(date -u +%F_%H%M)" || exit 0
+          git pull --rebase origin main || true
+          git push || true

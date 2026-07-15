@@ -1,0 +1,17 @@
+{
+ "ZEC": {
+  "side": "long",
+  "entry": 549.78,
+  "entry_ts": 1784044800
+ },
+ "HYPE": {
+  "side": "long",
+  "entry": 67.288,
+  "entry_ts": 1784084400
+ },
+ "SOL": {
+  "side": "long",
+  "entry": 77.99,
+  "entry_ts": 1784088000
+ }
+}

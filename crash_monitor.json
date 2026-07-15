@@ -6,7 +6,9 @@
    "risk": 0.005205378598088542,
    "stop": 0.07516062140191146,
    "entry_ts": 1783958400,
-   "status": "open"
+   "status": "closed",
+   "r": 0.65,
+   "closed_ts": 1784134283.890951
   },
   {
    "coin": "CASHCAT",

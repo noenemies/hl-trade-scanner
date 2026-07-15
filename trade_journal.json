@@ -7,5 +7,14 @@
   "closed_ts": 1784138923.937965,
   "r": -0.02,
   "reason": "stop"
+ },
+ {
+  "coin": "SOL",
+  "side": "long",
+  "entry": 77.99,
+  "opened_ts": 1784088000,
+  "closed_ts": 1784154607.168186,
+  "r": -0.82,
+  "reason": "stop"
  }
 ]

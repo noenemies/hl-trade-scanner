@@ -1,7 +1,7 @@
 name: trade-scanner
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/30 * * * *'   # во время цепочки встают в очередь и подхватывают эстафету
   workflow_dispatch:
 concurrency:
   group: scanner
@@ -9,9 +9,9 @@ concurrency:
 permissions:
   contents: write
 jobs:
-  scan:
+  chain:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 350
     env:
       TZ: America/Chicago
       CI: "true"
@@ -19,13 +19,17 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
-      - name: run scanner
-        run: python3 trade_scanner.py --auto --quiet
-      - name: persist state
+      - name: scan loop (10 итераций по ~29 минут)
         run: |
           git config user.name "scanner-bot"
           git config user.email "scanner@local"
-          git add -A -- '*.json' signals.log 2>/dev/null || true
-          git commit -m "state $(date -u +%F_%H%M)" || exit 0
-          git pull --rebase origin main || true
-          git push || true
+          for i in $(seq 1 10); do
+            echo "--- итерация $i: $(date) ---"
+            git pull --rebase origin main || true
+            python3 trade_scanner.py --auto --quiet || true
+            git add -A -- '*.json' signals.log 2>/dev/null || true
+            if git commit -m "state $(date -u +%F_%H%M)"; then
+              git push origin main || (git pull --rebase origin main && git push origin main) || true
+            fi
+            [ "$i" -lt 10 ] && sleep 1680
+          done

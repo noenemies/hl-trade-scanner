@@ -749,7 +749,7 @@ def scan_spxmr(state):
                 journal_trade('SP500', {'side': 'long', 'entry': pos['entry'],
                                         'entry_ts': pos.get('entry_ts', t)}, r_fin, 'spxmr')
                 alerts.append(('SPXMR:done', t,
-                               f"📊 SP500-MR закryta: {r_fin:+.2f}R (записано в журнал)"))
+                               f"📊 SP500-MR закрыта: {r_fin:+.2f}R (записано в журнал)"))
                 state['spxmr'] = None
                 lines.append(f"SPX-MR  сделка закрыта {r_fin:+.2f}R")
             else:

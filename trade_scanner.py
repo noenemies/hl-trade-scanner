@@ -1153,11 +1153,14 @@ def main():
         r = scan_nq_daytrade()
         if r.get('status') == 'СЕТАП АКТИВЕН':
             ei, si = r.get('entry_idx', r['entry']), r.get('sl_idx', r['sl'])
+            atr_third = abs(r['sl'] - r['entry']) / NQ_ATR_SL / 3
+            valid = ei - atr_third if r['side'] == 'ШОРТ' else ei + atr_third
+            v_txt = f"годен при цене {'выше' if r['side']=='ШОРТ' else 'ниже'} {valid:.0f}, иначе ПРОПУСК"
             msg = (f"NQ-MR   >>> {r['side']} | вход ~{ei:.0f} | стоп {si:.0f} (цены NASDAQ) | "
-                   f"{r['exit_rule']} | риск 0.15-0.2% | НЕ держать через ночь")
+                   f"{v_txt} | {r['exit_rule']} | риск 0.15-0.2%")
             alerts.append((f"NQ-MR:{r['side']}", r['bar_ts'],
-                           f"NASDAQ дейтрейд {r['side']}: вход ~{ei:.0f}, SL {si:.0f} "
-                           f"(по фьючерсу NQ: {r['entry']:.0f}/{r['sl']:.0f})"))
+                           f"NASDAQ дейтрейд {r['side']}: вход ~{ei:.0f}, SL {si:.0f}. "
+                           f"⏳ {v_txt.capitalize()}. (по фьючерсу NQ: {r['entry']:.0f}/{r['sl']:.0f})"))
         else:
             msg = f"NQ-MR   {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
         lines.append(msg)
@@ -1199,9 +1202,12 @@ def main():
                                    f"⚠️ {coin}: пробой 48h ПРОТИВ твоей позиции ({pos['side']}). "
                                    f"Трейлинг-стоп должен был сработать - проверь и закрой, если ещё нет."))
                 else:
+                    atr1 = abs(r['sl'] - r['entry']) / HYPE_ATR_TRAIL
+                    valid = r['entry'] + atr1 if r['side'] == 'ЛОНГ' else r['entry'] - atr1
+                    v_txt = f"годен при цене {'ниже' if r['side']=='ЛОНГ' else 'выше'} {valid:.4g}"
                     msg = (f"{coin:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
-                           f"{r['exit_rule']} | риск {risk_txt}")
-                    auto = ''
+                           f"{v_txt} | {r['exit_rule']} | риск {risk_txt}")
+                    auto = f' ⏳ {v_txt.capitalize()}, иначе пропуск.'
                     if state.get(f"{coin}:{r['side']}") != r['bar_ts']:
                         positions[coin] = {'side': sig_side,
                                            'entry': r['entry'], 'entry_ts': r['bar_ts']}

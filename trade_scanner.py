@@ -174,14 +174,25 @@ def scan_nq_daytrade():
     t, o, h, l, c = bars[-1]
     h_ct = dt.datetime.fromtimestamp(t, ZoneInfo('America/Chicago')).hour
     out = {'name': 'NQ-MR', 'price': c, 'rsi2': r2, 'ema200': e200}
+    # базис фьючерс-индекс: пользователь торгует/смотрит индекс NASDAQ, сигнал считается по NQ
+    basis = 0.0
+    try:
+        ndx = fetch_bars('^NDX', days=3, interval='1h')
+        if ndx:
+            basis = c - ndx[-1][4]
+            out['basis'] = basis
+    except Exception:
+        pass
     in_window = h_ct in NQ_ENTRY_HOURS_CT
     if r2 < NQ_RSI_LO and c > e200 and in_window:
         risk = NQ_ATR_SL * a
         out.update(status='СЕТАП АКТИВЕН', side='ЛОНГ', entry=c, sl=c - risk, tp=None,
+                   entry_idx=c - basis, sl_idx=c - risk - basis,
                    exit_rule='выход: RSI2>50 или закрытие 14:00 CT', bar_ts=t)
     elif r2 > NQ_RSI_HI and c < e200 and in_window:
         risk = NQ_ATR_SL * a
         out.update(status='СЕТАП АКТИВЕН', side='ШОРТ', entry=c, sl=c + risk, tp=None,
+                   entry_idx=c - basis, sl_idx=c + risk - basis,
                    exit_rule='выход: RSI2<50 или закрытие 14:00 CT', bar_ts=t)
     else:
         bias = 'лонги' if c > e200 else 'шорты'
@@ -1141,10 +1152,12 @@ def main():
             raise StopIteration
         r = scan_nq_daytrade()
         if r.get('status') == 'СЕТАП АКТИВЕН':
-            msg = (f"NQ-MR   >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
+            ei, si = r.get('entry_idx', r['entry']), r.get('sl_idx', r['sl'])
+            msg = (f"NQ-MR   >>> {r['side']} | вход ~{ei:.0f} | стоп {si:.0f} (цены NASDAQ) | "
                    f"{r['exit_rule']} | риск 0.15-0.2% | НЕ держать через ночь")
             alerts.append((f"NQ-MR:{r['side']}", r['bar_ts'],
-                           f"NQ дейтрейд {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}"))
+                           f"NASDAQ дейтрейд {r['side']}: вход ~{ei:.0f}, SL {si:.0f} "
+                           f"(по фьючерсу NQ: {r['entry']:.0f}/{r['sl']:.0f})"))
         else:
             msg = f"NQ-MR   {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
         lines.append(msg)

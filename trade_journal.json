@@ -52,5 +52,23 @@
   "closed_ts": 1784300967.470503,
   "r": -0.37,
   "reason": "stop"
+ },
+ {
+  "coin": "BNB",
+  "side": "short",
+  "entry": 573.37,
+  "opened_ts": 1784239200,
+  "closed_ts": 1784316194.110373,
+  "r": 1.02,
+  "reason": "stop"
+ },
+ {
+  "coin": "ETH",
+  "side": "short",
+  "entry": 1824.2,
+  "opened_ts": 1784264400,
+  "closed_ts": 1784316194.265123,
+  "r": -0.9,
+  "reason": "stop"
  }
 ]

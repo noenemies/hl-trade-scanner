@@ -694,6 +694,88 @@ def scan_crash_monitor():
     return lines, alerts
 
 
+# ===== SPX-MR: дневной mean-reversion по S&P 500 (добавлен 18.07.2026) =====
+# Бэктест ES дневки 2020-2026, исполнение по открытиям: PF 1.56/4.20 по половинам,
+# N=132, win 77%, DD -5.5R. Вход: IBS<0.2 ИЛИ RSI2<10 при закрытии выше MA200 -> лонг
+# на следующем открытии. Выход: IBS>0.8 или RSI2>70 или 5 дней -> на следующем открытии.
+# Внутридневные стратегии на ES не работают (7 конфигураций PF 0.92-1.04) - край только на дневках.
+SPXMR_RISK_ATR = 1.5
+
+
+def scan_spxmr(state):
+    """Состояния: нет -> pending (сигнал, ждём открытия) -> open -> closing -> журнал."""
+    lines, alerts = [], []
+    try:
+        bars = fetch_bars('ES=F', days=420, interval='1d', bar_sec=86400)
+        if len(bars) < 220:
+            return ['SPX-MR  нет данных'], []
+        closes = [b[4] for b in bars]
+        ma200 = sum(closes[-200:]) / 200
+        r2 = rsi2(closes[-30:])[-1]
+        a14 = atr(bars)[-1]
+        t, o, h, l, c = bars[-1]
+        ibs = (c - l) / (h - l) if h > l else 0.5
+        basis = 0.0
+        try:
+            spx = fetch_bars('^GSPC', days=7, interval='1d', bar_sec=86400)
+            if spx:
+                basis = c - spx[-1][4]
+        except Exception:
+            pass
+        pos = state.get('spxmr')
+        if pos and pos.get('status') == 'pending':
+            if t > pos['signal_bar']:
+                pos.update(status='open', entry=o, entry_bar=t, days=0)
+                lines.append(f"SPX-MR  позиция открыта по ~{o - basis:.0f} (открытие сессии)")
+            else:
+                lines.append('SPX-MR  ждём открытия сессии для входа')
+        elif pos and pos.get('status') == 'open':
+            if t > pos['entry_bar']:
+                pos['days'] = pos.get('days', 0) + 1
+                pos['entry_bar'] = t
+            r_now = (c - pos['entry']) / pos['risk']
+            if ibs > 0.8 or r2 > 70 or pos['days'] >= 5:
+                reason = 'IBS>0.8' if ibs > 0.8 else ('RSI2>70' if r2 > 70 else '5 дней')
+                pos.update(status='closing', exit_signal_bar=t)
+                alerts.append(('SPXMR:exit', t,
+                               f"📉 SP500-MR: сигнал выхода ({reason}) — закрыть лонг на СЛЕДУЮЩЕМ открытии "
+                               f"(сейчас {r_now:+.1f}R)"))
+                lines.append(f"SPX-MR  выход по {reason}, закрытие на следующем открытии ({r_now:+.1f}R)")
+            else:
+                lines.append(f"SPX-MR  в лонге, {r_now:+.1f}R, день {pos['days']}/5, IBS {ibs:.2f}, RSI2 {r2:.0f}")
+        elif pos and pos.get('status') == 'closing':
+            if t > pos['exit_signal_bar']:
+                r_fin = (o - pos['entry']) / pos['risk']
+                journal_trade('SP500', {'side': 'long', 'entry': pos['entry'],
+                                        'entry_ts': pos.get('entry_ts', t)}, r_fin, 'spxmr')
+                alerts.append(('SPXMR:done', t,
+                               f"📊 SP500-MR закryta: {r_fin:+.2f}R (записано в журнал)"))
+                state['spxmr'] = None
+                lines.append(f"SPX-MR  сделка закрыта {r_fin:+.2f}R")
+            else:
+                lines.append('SPX-MR  закрытие на ближайшем открытии')
+        else:
+            if (ibs < 0.2 or r2 < 10) and c > ma200:
+                key = 'SPXMR:ЛОНГ'
+                if state.get(key) != t:
+                    state[key] = t
+                    trigger = 'IBS<0.2' if ibs < 0.2 else 'RSI2<10'
+                    risk = SPXMR_RISK_ATR * a14
+                    state['spxmr'] = {'status': 'pending', 'signal_bar': t, 'risk': risk,
+                                      'entry_ts': dt.datetime.now().timestamp()}
+                    alerts.append((key, t,
+                                   f"📈 SP500-MR ЛОНГ ({trigger}, выше MA200): купить на СЛЕДУЮЩЕМ открытии "
+                                   f"(~{c - basis:.0f} в ценах SP500). Ориентир риска {risk:.0f} п. ES "
+                                   f"(1.5xATR). Выход по сигналу, обычно 1-3 дня. Риск 0.2-0.25%"))
+                    lines.append(f"SPX-MR  >>> ЛОНГ на следующем открытии ({trigger})")
+            else:
+                lines.append(f"SPX-MR  нет сигнала: IBS {ibs:.2f} (<0.2), RSI2 {r2:.0f} (<10), "
+                             f"{'выше' if c > ma200 else 'НИЖЕ'} MA200")
+    except Exception as ex:
+        lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_purr():
     bars = fetch_bars('PURR', days=10, interval='1d', bar_sec=86400)
     if len(bars) < 3:
@@ -1232,6 +1314,12 @@ def main():
             lines.append(msg)
         except Exception as ex:
             lines.append(f'SPCX    ОШИБКА: {str(ex)[:80]}')
+        try:
+            sx_lines, sx_alerts = scan_spxmr(state)
+            lines.extend(sx_lines)
+            alerts.extend(sx_alerts)
+        except Exception as ex:
+            lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
         try:
             r = scan_purr()
             if r.get('status') == 'СИГНАЛ':

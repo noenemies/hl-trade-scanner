@@ -1,1 +1,12 @@
-{}
+{
+ "ETH": {
+  "side": "long",
+  "entry": 1871.8,
+  "entry_ts": 1784426400
+ },
+ "SOL": {
+  "side": "long",
+  "entry": 76.176,
+  "entry_ts": 1784426400
+ }
+}

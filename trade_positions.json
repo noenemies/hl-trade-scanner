@@ -8,5 +8,15 @@
   "side": "long",
   "entry": 76.176,
   "entry_ts": 1784426400
+ },
+ "HYPE": {
+  "side": "long",
+  "entry": 61.282,
+  "entry_ts": 1784448000
+ },
+ "ZEC": {
+  "side": "long",
+  "entry": 564.49,
+  "entry_ts": 1784448000
  }
 }

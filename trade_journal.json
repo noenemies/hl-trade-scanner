@@ -88,5 +88,23 @@
   "closed_ts": 1784481797.964996,
   "r": -1.0,
   "reason": "stop"
+ },
+ {
+  "coin": "ETH",
+  "side": "long",
+  "entry": 1871.8,
+  "opened_ts": 1784426400,
+  "closed_ts": 1784488563.883896,
+  "r": -0.82,
+  "reason": "stop"
+ },
+ {
+  "coin": "SOL",
+  "side": "long",
+  "entry": 76.176,
+  "opened_ts": 1784426400,
+  "closed_ts": 1784488564.037133,
+  "r": -0.85,
+  "reason": "stop"
  }
 ]

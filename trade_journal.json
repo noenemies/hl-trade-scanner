@@ -133,5 +133,14 @@
   "closed_ts": 1784556135.387708,
   "r": -1.0,
   "reason": "stop"
+ },
+ {
+  "coin": "ZEC",
+  "side": "short",
+  "entry": 532.16,
+  "opened_ts": 1784520000,
+  "closed_ts": 1784564613.056627,
+  "r": -0.75,
+  "reason": "stop"
  }
 ]

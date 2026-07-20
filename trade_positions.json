@@ -1,7 +1,22 @@
 {
- "ZEC": {
-  "side": "short",
-  "entry": 532.16,
-  "entry_ts": 1784520000
+ "HYPE": {
+  "side": "long",
+  "entry": 62.182,
+  "entry_ts": 1784559600
+ },
+ "ETH": {
+  "side": "long",
+  "entry": 1902.0,
+  "entry_ts": 1784559600
+ },
+ "SOL": {
+  "side": "long",
+  "entry": 77.746,
+  "entry_ts": 1784559600
+ },
+ "BNB": {
+  "side": "long",
+  "entry": 573.77,
+  "entry_ts": 1784559600
  }
 }

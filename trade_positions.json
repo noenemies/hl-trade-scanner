@@ -3,5 +3,10 @@
   "side": "short",
   "entry": 532.16,
   "entry_ts": 1784520000
+ },
+ "BNB": {
+  "side": "short",
+  "entry": 564.96,
+  "entry_ts": 1784523600
  }
 }

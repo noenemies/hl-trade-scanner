@@ -173,16 +173,16 @@ def scan_nq_daytrade():
     a = atr(bars)[-1]
     t, o, h, l, c = bars[-1]
     h_ct = dt.datetime.fromtimestamp(t, ZoneInfo('America/Chicago')).hour
-    out = {'name': 'NQ-MR', 'price': c, 'rsi2': r2, 'ema200': e200}
+    out = {'name': 'NQ-MR', 'price': c, 'rsi2': r2, 'ema200': e200, 'hour_ct': h_ct}
     # базис фьючерс-индекс: пользователь торгует/смотрит индекс NASDAQ, сигнал считается по NQ
     basis = 0.0
     try:
         ndx = fetch_bars('^NDX', days=3, interval='1h')
         if ndx:
             basis = c - ndx[-1][4]
-            out['basis'] = basis
     except Exception:
         pass
+    out['basis'] = basis
     in_window = h_ct in NQ_ENTRY_HOURS_CT
     if r2 < NQ_RSI_LO and c > e200 and in_window:
         risk = NQ_ATR_SL * a
@@ -1234,19 +1234,50 @@ def main():
         if btc_only:
             raise StopIteration
         r = scan_nq_daytrade()
-        if r.get('status') == 'СЕТАП АКТИВЕН':
+        nqpos = state.get('nqmr')
+        c_nq, r2_nq, h_nq = r.get('price'), r.get('rsi2'), r.get('hour_ct')
+        bs = r.get('basis', 0.0)
+        if nqpos and c_nq is not None:
+            d = 1 if nqpos['side'] == 'ЛОНГ' else -1
+            r_now = d * (c_nq - nqpos['entry']) / nqpos['risk']
+            hit_stop = (c_nq <= nqpos['stop']) if d == 1 else (c_nq >= nqpos['stop'])
+            rsi_exit = (r2_nq >= 50) if d == 1 else (r2_nq <= 50)
+            eod = h_nq is not None and h_nq >= 14
+            if hit_stop or rsi_exit or eod:
+                reason = 'стоп' if hit_stop else ('RSI2' if rsi_exit else 'закрытие 14:00 CT')
+                r_fin = -1.0 if hit_stop else r_now
+                journal_trade('NASDAQ', {'side': nqpos['side'].lower().replace('лонг','long').replace('шорт','short'),
+                                         'entry': nqpos['entry'], 'entry_ts': nqpos['entry_ts']},
+                              r_fin, f'nqmr-{reason}')
+                alerts.append(('NQ-MR:close', nqpos['entry_ts'],
+                               f"🔚 NASDAQ дейтрейд ЗАКРЫТ по правилу ({reason}): {r_fin:+.2f}R "
+                               f"(цена ~{c_nq - bs:.0f}). Закрой позицию, если ещё в рынке."))
+                lines.append(f"NQ-MR   позиция закрыта ({reason}): {r_fin:+.2f}R")
+                state['nqmr'] = None
+            else:
+                lines.append(f"NQ-MR   в позиции {nqpos['side']}, {r_now:+.1f}R, "
+                             f"RSI2 {r2_nq:.0f}, до 14:00 CT")
+        elif r.get('status') == 'СЕТАП АКТИВЕН':
             ei, si = r.get('entry_idx', r['entry']), r.get('sl_idx', r['sl'])
             atr_third = abs(r['sl'] - r['entry']) / NQ_ATR_SL / 3
             valid = ei - atr_third if r['side'] == 'ШОРТ' else ei + atr_third
             v_txt = f"годен при цене {'выше' if r['side']=='ШОРТ' else 'ниже'} {valid:.0f}, иначе ПРОПУСК"
+            if state.get(f"NQ-MR:{r['side']}") != r['bar_ts']:
+                state[f"NQ-MR:{r['side']}"] = r['bar_ts']
+                state['nqmr'] = {'side': r['side'], 'entry': r['entry'], 'stop': r['sl'],
+                                 'risk': r['sl'] - r['entry'] if r['side']=='ШОРТ' else r['entry']-r['sl'],
+                                 'entry_ts': r['bar_ts']}
+                state['nqmr']['risk'] = abs(state['nqmr']['risk'])
+                alerts.append((f"NQ-MR:{r['side']}", r['bar_ts'],
+                               f"NASDAQ дейтрейд {r['side']}: вход ~{ei:.0f}, SL {si:.0f}. "
+                               f"⏳ {v_txt.capitalize()}. Учёт ведётся, алерт о закрытии придёт. "
+                               f"(по фьючерсу NQ: {r['entry']:.0f}/{r['sl']:.0f})"))
             msg = (f"NQ-MR   >>> {r['side']} | вход ~{ei:.0f} | стоп {si:.0f} (цены NASDAQ) | "
                    f"{v_txt} | {r['exit_rule']} | риск 0.15-0.2%")
-            alerts.append((f"NQ-MR:{r['side']}", r['bar_ts'],
-                           f"NASDAQ дейтрейд {r['side']}: вход ~{ei:.0f}, SL {si:.0f}. "
-                           f"⏳ {v_txt.capitalize()}. (по фьючерсу NQ: {r['entry']:.0f}/{r['sl']:.0f})"))
+            lines.append(msg)
         else:
             msg = f"NQ-MR   {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
-        lines.append(msg)
+            lines.append(msg)
     except StopIteration:
         pass
     except Exception as ex:

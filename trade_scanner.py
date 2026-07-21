@@ -275,6 +275,58 @@ def journal_trade(coin, pos, r, reason):
     JOURNAL.write_text(json.dumps(j, indent=1))
 
 
+def tpsl_register(state, name, side, entry, sl, tp, bar_ts, daytrade=False, timestop_h=72, rr=3.0):
+    """Регистрирует TP/SL позицию для учёта. Возврат False, если уже в позиции."""
+    book = state.get('tpsl') or {}
+    if book.get(name):
+        return False
+    book[name] = {'side': side, 'entry': entry, 'sl': sl, 'tp': tp, 'entry_ts': bar_ts,
+                  'daytrade': daytrade, 'timestop_h': timestop_h, 'rr': rr}
+    state['tpsl'] = book
+    return True
+
+
+def tpsl_track(state, name, price):
+    """Ведёт открытую TP/SL позицию. Возвращает (строка_статуса, список_алертов)."""
+    book = state.get('tpsl') or {}
+    pos = book.get(name)
+    if not pos or price is None:
+        return None, []
+    d = 1 if pos['side'] in ('ЛОНГ', 'long') else -1
+    risk = abs(pos['entry'] - pos['sl'])
+    if risk <= 0:
+        return None, []
+    r_now = d * (price - pos['entry']) / risk
+    hit_sl = price <= pos['sl'] if d == 1 else price >= pos['sl']
+    hit_tp = price >= pos['tp'] if d == 1 else price <= pos['tp']
+    now = dt.datetime.now().timestamp()
+    hours = (now - pos['entry_ts']) / 3600
+    if pos.get('daytrade'):
+        entry_date = dt.datetime.fromtimestamp(pos['entry_ts'], dt.timezone.utc).date()
+        eod = dt.datetime.now(dt.timezone.utc).date() != entry_date
+        tstop = False
+    else:
+        eod = False
+        tstop = hours >= pos.get('timestop_h', 72)
+    if hit_sl or hit_tp or eod or tstop:
+        if hit_sl:
+            r_fin, reason = -1.0, 'стоп'
+        elif hit_tp:
+            r_fin, reason = pos.get('rr', 3.0), 'тейк'
+        elif eod:
+            r_fin, reason = r_now, 'конец дня'
+        else:
+            r_fin, reason = r_now, 'тайм-стоп'
+        journal_trade(name, {'side': 'long' if d == 1 else 'short',
+                             'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
+        book[name] = None
+        state['tpsl'] = {k: v for k, v in book.items() if v}
+        return (f"{name:7} позиция закрыта ({reason}): {r_fin:+.2f}R",
+                [(f'{name}:close', pos['entry_ts'],
+                  f"🔚 {name} ЗАКРЫТ по правилу ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке.")])
+    return (f"{name:7} в позиции {pos['side']}, {r_now:+.1f}R", [])
+
+
 def monthly_report(state):
     """Отчёт за прошлый месяц - шлётся с первой утренней сводкой нового месяца."""
     today = dt.date.today()
@@ -290,19 +342,36 @@ def monthly_report(state):
     state['monthly_report'] = tag
     if not rows:
         return f'\n\n📊 Отчёт за {prev_month}: закрытых сделок не было.'
+    cats = {'🪙 Крипта': {'BTC', 'ETH', 'SOL', 'HYPE', 'ZEC', 'BNB', 'BTC-DT'},
+            '🥇 Металлы': {'GOLD', 'SILVER', 'GOLD-DT'},
+            '📈 Индексы': {'NASDAQ', 'SP500'}}
+    def block(rs):
+        plus = sum(1 for x in rs if x > 0); w = [x for x in rs if x > 0.05]; l = [x for x in rs if x < -0.05]
+        pf = (sum(w) / abs(sum(l))) if l else 99
+        return plus, len(rs) - plus, sum(rs), pf
     by = {}
     for t in rows:
         by.setdefault(t['coin'], []).append(t['r'])
-    lines = [f'\n\n📊 Отчёт за {prev_month} ({len(rows)} сделок):']
-    for coin in sorted(by, key=lambda c: -sum(by[c])):
-        rs = by[coin]
-        plus = sum(1 for x in rs if x > 0); minus = len(rs) - plus
-        lines.append(f'  {coin}: {plus}+ / {minus}-  итог {sum(rs):+.1f}R')
+    lines = [f'\n\n📊 ОТЧЁТ за {prev_month} ({len(rows)} сделок):']
+    for cat, members in cats.items():
+        cat_coins = [c for c in by if c in members]
+        if not cat_coins:
+            continue
+        cat_rs = [r for c in cat_coins for r in by[c]]
+        p, m, tot, pf = block(cat_rs)
+        lines.append(f'{cat}: {p}+ / {m}-, {tot:+.1f}R, PF {pf:.2f}')
+        for coin in sorted(cat_coins, key=lambda c: -sum(by[c])):
+            cp, cm, ct, _ = block(by[coin])
+            lines.append(f'   {coin}: {cp}+ / {cm}-  {ct:+.1f}R')
+    # прочее (что не попало в категории)
+    other = [c for c in by if not any(c in mm for mm in cats.values())]
+    if other:
+        ors = [r for c in other for r in by[c]]
+        p, m, tot, pf = block(ors)
+        lines.append(f'📦 Прочее: {p}+ / {m}-, {tot:+.1f}R')
     allr = [t['r'] for t in rows]
-    wins = [x for x in allr if x > 0.05]; losses = [x for x in allr if x < -0.05]
-    pf = (sum(wins)/abs(sum(losses))) if losses else 99
-    lines.append(f'  ИТОГО: {sum(1 for x in allr if x>0)}+ / {sum(1 for x in allr if x<=0)}-, '
-                 f'{sum(allr):+.1f}R, PF {pf:.2f}, win rate {sum(1 for x in allr if x>0)/len(allr):.0%}')
+    p, m, tot, pf = block(allr)
+    lines.append(f'━━ ИТОГО: {p}+ / {m}-, {tot:+.1f}R, PF {pf:.2f}, win {p/len(allr):.0%}')
     return '\n'.join(lines)
 
 
@@ -1220,16 +1289,22 @@ def main():
         except Exception as ex:
             lines.append(f'{name:7} ОШИБКА: {str(ex)[:80]}')
             continue
-        if r.get('status') == 'СЕТАП АКТИВЕН':
+        tline, talerts = tpsl_track(state, name, r.get('price'))
+        alerts.extend(talerts)
+        if tline:
+            lines.append(tline)
+        elif r.get('status') == 'СЕТАП АКТИВЕН':
+            if tpsl_register(state, name, r['side'], r['entry'], r['sl'], r['tp'],
+                             r['bar_ts'], daytrade=False, timestop_h=72, rr=3.0):
+                alerts.append((f"{name}:{r['side']}", r['bar_ts'],
+                               f"{name} {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}, TP {r['tp']:.2f}. Учёт R ведётся."))
             msg = (f"{name:7} >>> {r['side']} | вход ~{r['entry']:.2f} | "
                    f"стоп {r['sl']:.2f} | тейк {r['tp']:.2f}"
                    + (f" | безубыток от {r['be']:.2f}" if r['be'] else '')
                    + ' | риск 0.25-0.3%')
-            alerts.append((f"{name}:{r['side']}", r['bar_ts'],
-                           f"{name} {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}, TP {r['tp']:.2f}"))
+            lines.append(msg)
         else:
-            msg = f"{name:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
-        lines.append(msg)
+            lines.append(f"{name:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else ''))
     try:
         if btc_only:
             raise StopIteration
@@ -1268,9 +1343,12 @@ def main():
                                  'risk': r['sl'] - r['entry'] if r['side']=='ШОРТ' else r['entry']-r['sl'],
                                  'entry_ts': r['bar_ts']}
                 state['nqmr']['risk'] = abs(state['nqmr']['risk'])
+                late = ''
+                if r.get('hour_ct', 0) >= 13:
+                    late = ' ⚠️ ПОЗДНИЙ сигнал: выход в 14:00 CT, отработка <1ч - можно пропустить.'
                 alerts.append((f"NQ-MR:{r['side']}", r['bar_ts'],
                                f"NASDAQ дейтрейд {r['side']}: вход ~{ei:.0f}, SL {si:.0f}. "
-                               f"⏳ {v_txt.capitalize()}. Учёт ведётся, алерт о закрытии придёт. "
+                               f"⏳ {v_txt.capitalize()}. Учёт ведётся, алерт о закрытии придёт.{late} "
                                f"(по фьючерсу NQ: {r['entry']:.0f}/{r['sl']:.0f})"))
             msg = (f"NQ-MR   >>> {r['side']} | вход ~{ei:.0f} | стоп {si:.0f} (цены NASDAQ) | "
                    f"{v_txt} | {r['exit_rule']} | риск 0.15-0.2%")
@@ -1287,23 +1365,27 @@ def main():
             continue
         try:
             r = scan_day_pullback(dname, dsym, dopen)
-            if r.get('status') == 'СЕТАП АКТИВЕН':
+            tline, talerts = tpsl_track(state, dname, r.get('price'))
+            alerts.extend(talerts)
+            if tline:
+                lines.append(tline)
+            elif r.get('status') == 'СЕТАП АКТИВЕН':
                 exp = ' [ЭКСПЕРИМЕНТ, риск 0.1%]' if dname == 'GOLD-DT' else ' | риск 0.15-0.2%'
-                # BTC-DT: не более 1 сигнала в 6 часов
                 cd_key = f'{dname}:last_signal'
                 last = state.get(cd_key, 0)
                 if dname == 'BTC-DT' and r['bar_ts'] - last < 6 * 3600:
                     left = (6 * 3600 - (r['bar_ts'] - last)) / 3600
-                    msg = f"{dname:7} сетап {r['side']}, но кулдаун ещё {left:.1f}ч - подавлен"
+                    lines.append(f"{dname:7} сетап {r['side']}, но кулдаун ещё {left:.1f}ч - подавлен")
                 else:
                     state[cd_key] = r['bar_ts']
-                    msg = (f"{dname:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
-                           f"тейк {r['tp']:.2f} | выход не позже конца дня{exp}")
+                    tpsl_register(state, dname, r['side'], r['entry'], r['sl'], r['tp'],
+                                  r['bar_ts'], daytrade=True, rr=3.0)
                     alerts.append((f"{dname}:{r['side']}", r['bar_ts'],
-                                   f"{dname} {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}, TP {r['tp']:.2f}"))
+                                   f"{dname} {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}, TP {r['tp']:.2f}. Учёт R ведётся."))
+                    lines.append(f"{dname:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
+                                 f"тейк {r['tp']:.2f} | выход не позже конца дня{exp}")
             else:
-                msg = f"{dname:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
-            lines.append(msg)
+                lines.append(f"{dname:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else ''))
         except Exception as ex:
             lines.append(f'{dname:7} ОШИБКА: {str(ex)[:80]}')
     positions = load_positions()

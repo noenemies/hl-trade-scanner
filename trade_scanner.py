@@ -71,7 +71,7 @@ def fetch_hl_bars(coin, interval='1h', days=150, bar_sec=3600):
     return [b for b in bars if b[0] <= cutoff]
 
 
-HL_COINS = {'BTC', 'HYPE', 'ETH', 'SOL', 'ZEC', 'BNB'}
+HL_COINS = {'BTC', 'HYPE', 'ETH', 'SOL', 'ZEC'}
 
 
 def fetch_any(symbol, days=150, interval='1h', bar_sec=3600):
@@ -203,6 +203,7 @@ def scan_nq_daytrade():
 
 
 # Модуль дейтрейдинга BTC/GOLD на 30m: тренд 1h (EMA50/200) + откат к EMA20(30m).
+# BTC-DT: кулдаун 6ч между сигналами (18.07) - в сильном тренде каждый бар давал новый сетап.
 # Бэктест: BTC (6 мес, Coinbase 15m/30m) - PF 1.19, стабилен в обеих половинах и на 15m, и на 30m.
 # GOLD - PF 1.34-1.53, но выборка всего 60 дней => статус ЭКСПЕРИМЕНТАЛЬНЫЙ, риск 0.1%,
 # пересмотр после 50 сделок. RSI2-MR и азиатский пробой тест НЕ прошли.
@@ -258,7 +259,7 @@ def scan_day_pullback(name, symbol, always_open):
 #   SOL  (2 года): PF 1.16/1.19, N=394  | откатная свинг-система на альтах НЕ работает (PF<1)
 # Риск: ETH/SOL 0.15-0.2% (2 года данных), HYPE 0.1-0.15% (13 мес).
 HYPE_LOOKBACK, HYPE_ATR_TRAIL, HYPE_TIME_STOP_H = 48, 2.5, 120
-CRYPTO_BREAKOUT = ['HYPE', 'ETH', 'SOL', 'ZEC', 'BNB']   # ZEC эксперимент (7 мес, PF 2.96); BNB добавлен 15.07 (PF 1.14/1.43, 2 года)
+CRYPTO_BREAKOUT = ['HYPE', 'ETH', 'SOL', 'ZEC']   # ZEC эксперимент (7 мес, PF 2.96); BNB убран 18.07 по запросу
 POSITIONS = Path(__file__).with_name('trade_positions.json')  # открытые позиции для ведения трейлинга
 JOURNAL = Path(__file__).with_name('trade_journal.json')       # архив закрытых сделок для месячной статистики
 
@@ -1257,10 +1258,18 @@ def main():
             r = scan_day_pullback(dname, dsym, dopen)
             if r.get('status') == 'СЕТАП АКТИВЕН':
                 exp = ' [ЭКСПЕРИМЕНТ, риск 0.1%]' if dname == 'GOLD-DT' else ' | риск 0.15-0.2%'
-                msg = (f"{dname:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
-                       f"тейк {r['tp']:.2f} | выход не позже конца дня{exp}")
-                alerts.append((f"{dname}:{r['side']}", r['bar_ts'],
-                               f"{dname} {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}, TP {r['tp']:.2f}"))
+                # BTC-DT: не более 1 сигнала в 6 часов
+                cd_key = f'{dname}:last_signal'
+                last = state.get(cd_key, 0)
+                if dname == 'BTC-DT' and r['bar_ts'] - last < 6 * 3600:
+                    left = (6 * 3600 - (r['bar_ts'] - last)) / 3600
+                    msg = f"{dname:7} сетап {r['side']}, но кулдаун ещё {left:.1f}ч - подавлен"
+                else:
+                    state[cd_key] = r['bar_ts']
+                    msg = (f"{dname:7} >>> {r['side']} | вход ~{r['entry']:.2f} | стоп {r['sl']:.2f} | "
+                           f"тейк {r['tp']:.2f} | выход не позже конца дня{exp}")
+                    alerts.append((f"{dname}:{r['side']}", r['bar_ts'],
+                                   f"{dname} {r['side']}: вход {r['entry']:.2f}, SL {r['sl']:.2f}, TP {r['tp']:.2f}"))
             else:
                 msg = f"{dname:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
             lines.append(msg)

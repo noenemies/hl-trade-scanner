@@ -151,5 +151,14 @@
   "closed_ts": 1784647468.049797,
   "r": -0.19,
   "reason": "stop"
+ },
+ {
+  "coin": "BNB",
+  "side": "long",
+  "entry": 573.77,
+  "opened_ts": 1784559600,
+  "closed_ts": 1784657630.657294,
+  "r": -0.03,
+  "reason": "stop"
  }
 ]

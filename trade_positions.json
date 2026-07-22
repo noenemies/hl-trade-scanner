@@ -8,5 +8,10 @@
   "side": "long",
   "entry": 77.746,
   "entry_ts": 1784559600
+ },
+ "ZEC": {
+  "side": "short",
+  "entry": 520.99,
+  "entry_ts": 1784689200
  }
 }

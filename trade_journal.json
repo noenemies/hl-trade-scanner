@@ -196,5 +196,14 @@
   "closed_ts": 1784725216.259798,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "HYPE",
+  "side": "short",
+  "entry": 59.02,
+  "opened_ts": 1784696400,
+  "closed_ts": 1784747250.250956,
+  "r": -0.38,
+  "reason": "stop"
  }
 ]

@@ -160,5 +160,14 @@
   "closed_ts": 1784657630.657294,
   "r": -0.03,
   "reason": "stop"
+ },
+ {
+  "coin": "BTC-DT",
+  "side": "long",
+  "entry": 66376.0,
+  "opened_ts": 1784660400,
+  "closed_ts": 1784679587.959868,
+  "r": 0.33,
+  "reason": "\u043a\u043e\u043d\u0435\u0446 \u0434\u043d\u044f"
  }
 ]

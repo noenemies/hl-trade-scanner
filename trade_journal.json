@@ -178,5 +178,14 @@
   "closed_ts": 1784701550.991734,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "SOL",
+  "side": "long",
+  "entry": 77.746,
+  "opened_ts": 1784559600,
+  "closed_ts": 1784704935.750784,
+  "r": -0.29,
+  "reason": "stop"
  }
 ]

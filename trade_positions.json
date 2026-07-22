@@ -4,11 +4,6 @@
   "entry": 1902.0,
   "entry_ts": 1784559600
  },
- "SOL": {
-  "side": "long",
-  "entry": 77.746,
-  "entry_ts": 1784559600
- },
  "ZEC": {
   "side": "short",
   "entry": 520.99,

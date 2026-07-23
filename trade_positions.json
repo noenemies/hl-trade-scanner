@@ -1,9 +1,4 @@
 {
- "ETH": {
-  "side": "long",
-  "entry": 1902.0,
-  "entry_ts": 1784559600
- },
  "ZEC": {
   "side": "short",
   "entry": 520.99,

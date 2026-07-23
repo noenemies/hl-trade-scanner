@@ -223,5 +223,23 @@
   "closed_ts": 1784794562.749817,
   "r": 0.26,
   "reason": "stop"
+ },
+ {
+  "coin": "GOLD-DT",
+  "side": "long",
+  "entry": 4133.4,
+  "opened_ts": 1784725200,
+  "closed_ts": 1784809754.502396,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "SP500",
+  "side": "long",
+  "entry": 7484.0,
+  "opened_ts": 1784637305.625058,
+  "closed_ts": 1784809755.490765,
+  "r": 0.45,
+  "reason": "spxmr"
  }
 ]

@@ -241,5 +241,14 @@
   "closed_ts": 1784809755.490765,
   "r": 0.45,
   "reason": "spxmr"
+ },
+ {
+  "coin": "BTC",
+  "side": "long",
+  "entry": 66022.0,
+  "opened_ts": 1784732400,
+  "closed_ts": 1784813131.585224,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
  }
 ]

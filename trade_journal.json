@@ -250,5 +250,14 @@
   "closed_ts": 1784813131.585224,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH",
+  "side": "short",
+  "entry": 1903.4,
+  "opened_ts": 1784808000,
+  "closed_ts": 1784880748.781679,
+  "r": 0.13,
+  "reason": "stop"
  }
 ]

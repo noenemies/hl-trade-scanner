@@ -349,5 +349,14 @@
   "closed_ts": 1785147195.396254,
   "r": -0.96,
   "reason": "stop"
+ },
+ {
+  "coin": "GOLD",
+  "side": "short",
+  "entry": 4056.2,
+  "opened_ts": 1784916000,
+  "closed_ts": 1785155644.119645,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
  }
 ]

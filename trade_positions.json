@@ -3,5 +3,15 @@
   "side": "short",
   "entry": 57.411,
   "entry_ts": 1785164400
+ },
+ "SOL": {
+  "side": "short",
+  "entry": 74.021,
+  "entry_ts": 1785189600
+ },
+ "ZEC": {
+  "side": "short",
+  "entry": 478.13,
+  "entry_ts": 1785189600
  }
 }

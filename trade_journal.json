@@ -340,5 +340,14 @@
   "closed_ts": 1785079610.743101,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ZEC",
+  "side": "long",
+  "entry": 507.71,
+  "opened_ts": 1785103200,
+  "closed_ts": 1785147195.396254,
+  "r": -0.96,
+  "reason": "stop"
  }
 ]

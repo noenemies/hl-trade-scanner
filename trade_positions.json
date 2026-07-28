@@ -13,5 +13,10 @@
   "side": "short",
   "entry": 478.13,
   "entry_ts": 1785189600
+ },
+ "ETH": {
+  "side": "short",
+  "entry": 1875.2,
+  "entry_ts": 1785200400
  }
 }

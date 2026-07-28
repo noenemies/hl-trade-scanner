@@ -430,5 +430,41 @@
   "closed_ts": 1785241654.61319,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "BTC-DT",
+  "side": "short",
+  "entry": 63434.0,
+  "opened_ts": 1785236400,
+  "closed_ts": 1785255207.398445,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "SOL",
+  "side": "short",
+  "entry": 74.021,
+  "opened_ts": 1785189600,
+  "closed_ts": 1785255214.129446,
+  "r": 0.03,
+  "reason": "stop"
+ },
+ {
+  "coin": "ZEC",
+  "side": "short",
+  "entry": 478.13,
+  "opened_ts": 1785189600,
+  "closed_ts": 1785255214.641657,
+  "r": 0.24,
+  "reason": "stop"
+ },
+ {
+  "coin": "ETH",
+  "side": "short",
+  "entry": 1875.2,
+  "opened_ts": 1785200400,
+  "closed_ts": 1785255214.870058,
+  "r": -0.81,
+  "reason": "stop"
  }
 ]

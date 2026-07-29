@@ -511,5 +511,41 @@
   "closed_ts": 1785344807.11415,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "GOLD",
+  "side": "short",
+  "entry": 4038.7,
+  "opened_ts": 1785254400,
+  "closed_ts": 1785353256.20256,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "SILVER",
+  "side": "short",
+  "entry": 57.349,
+  "opened_ts": 1785254400,
+  "closed_ts": 1785353256.759949,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "NASDAQ",
+  "side": "short",
+  "entry": 28043.25,
+  "opened_ts": 1785348000,
+  "closed_ts": 1785353256.984651,
+  "r": 0.52,
+  "reason": "nqmr-RSI2"
+ },
+ {
+  "coin": "ZEC",
+  "side": "short",
+  "entry": 453.83,
+  "opened_ts": 1785294000,
+  "closed_ts": 1785353262.694735,
+  "r": -1.0,
+  "reason": "stop"
  }
 ]

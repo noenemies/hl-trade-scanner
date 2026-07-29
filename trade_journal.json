@@ -547,5 +547,14 @@
   "closed_ts": 1785353262.694735,
   "r": -1.0,
   "reason": "stop"
+ },
+ {
+  "coin": "BTC",
+  "side": "long",
+  "entry": 64474.0,
+  "opened_ts": 1785348000,
+  "closed_ts": 1785356661.734256,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
  }
 ]

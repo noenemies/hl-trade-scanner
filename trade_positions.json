@@ -3,5 +3,10 @@
   "side": "short",
   "entry": 53.111,
   "entry_ts": 1785351600
+ },
+ "SOL": {
+  "side": "long",
+  "entry": 74.645,
+  "entry_ts": 1785416400
  }
 }

@@ -601,5 +601,23 @@
   "closed_ts": 1785439476.702879,
   "r": -0.33,
   "reason": "nqmr-\u0437\u0430\u043a\u0440\u044b\u0442\u0438\u0435 14:00 CT"
+ },
+ {
+  "coin": "SOL",
+  "side": "long",
+  "entry": 74.645,
+  "opened_ts": 1785416400,
+  "closed_ts": 1785485123.800371,
+  "r": -0.82,
+  "reason": "stop"
+ },
+ {
+  "coin": "HYPE",
+  "side": "long",
+  "entry": 55.967,
+  "opened_ts": 1785448800,
+  "closed_ts": 1785485124.087545,
+  "r": -1.0,
+  "reason": "stop"
  }
 ]

@@ -828,7 +828,6 @@ def scan_spxmr(state):
             if (ibs < 0.2 or r2 < 10) and c > ma200:
                 key = 'SPXMR:ЛОНГ'
                 if state.get(key) != t:
-                    state[key] = t
                     trigger = 'IBS<0.2' if ibs < 0.2 else 'RSI2<10'
                     risk = SPXMR_RISK_ATR * a14
                     state['spxmr'] = {'status': 'pending', 'signal_bar': t, 'risk': risk,
@@ -1338,7 +1337,6 @@ def main():
             valid = ei - atr_third if r['side'] == 'ШОРТ' else ei + atr_third
             v_txt = f"годен при цене {'выше' if r['side']=='ШОРТ' else 'ниже'} {valid:.0f}, иначе ПРОПУСК"
             if state.get(f"NQ-MR:{r['side']}") != r['bar_ts']:
-                state[f"NQ-MR:{r['side']}"] = r['bar_ts']
                 state['nqmr'] = {'side': r['side'], 'entry': r['entry'], 'stop': r['sl'],
                                  'risk': r['sl'] - r['entry'] if r['side']=='ШОРТ' else r['entry']-r['sl'],
                                  'entry_ts': r['bar_ts']}

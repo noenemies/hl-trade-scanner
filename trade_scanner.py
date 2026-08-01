@@ -779,6 +779,61 @@ SPXMR_RISK_ATR = 1.5
 GOLD4H_TRAIL = 2.5
 
 
+# Модуль BTC-SWEEP: SMC свип ликвидности + фильтр тренда EMA200 на 4h (добавлен 01.08.2026).
+# Бэктест BTC 4h, 2 года: PF 1.35/1.15 по половинам (обе в плюсе), 101 сделка, win 42%, +15R.
+# Логика: цена снимает ликвидность за 20-барным свинг-лоу (пробой фитилём) и закрывается обратно
+# ВЫШЕ него в бычьем тренде (>EMA200) -> лонг. Зеркально шорт. Стоп за фитилём свипа, тейк 2R.
+# Сырой свип БЕЗ фильтра тренда убыточен (PF 0.88) - фильтр обязателен. Риск 0.15%, ЭКСПЕРИМЕНТ.
+SWEEP_LOOK, SWEEP_RR, SWEEP_TSTOP_H = 20, 2.0, 96
+
+
+def scan_btc4h_sweep(state):
+    lines, alerts = [], []
+    try:
+        bars = fetch_hl_bars('BTC', '4h', days=45)
+        if len(bars) < 210:
+            return ['BTC-SWP нет данных'], []
+        cl = [b[4] for b in bars]
+        e200 = ema(cl, 200)[-1]
+        t, o, h, l, c = bars[-1]
+        # ведём открытую позицию через общий TP/SL-трекер
+        tline, talerts = tpsl_track(state, 'BTC-SWEEP', c)
+        alerts.extend(talerts)
+        if tline:
+            lines.append(tline)
+            return lines, alerts
+        # ищем свип на последнем закрытом баре
+        window = bars[-SWEEP_LOOK-1:-1]
+        sw_lo = min(b[3] for b in window); sw_hi = max(b[2] for b in window)
+        sig = None
+        if l < sw_lo and c > sw_lo and c > e200:
+            risk = c - l
+            if risk > 0:
+                sig = ('long', c, l, c + SWEEP_RR * risk)
+        elif h > sw_hi and c < sw_hi and c < e200:
+            risk = h - c
+            if risk > 0:
+                sig = ('short', c, h, c - SWEEP_RR * risk)
+        if sig:
+            side, entry, sl, tp = sig
+            key = f'BTC-SWEEP:{side}'
+            if state.get(key) != t:
+                tpsl_register(state, 'BTC-SWEEP', side, entry, sl, tp, t,
+                              daytrade=False, timestop_h=SWEEP_TSTOP_H, rr=SWEEP_RR)
+                bias = 'бычьем' if side == 'long' else 'медвежьем'
+                alerts.append((key, t,
+                               f"💧 BTC-SWEEP {side.upper()} (свип ликвидности в {bias} тренде): "
+                               f"вход ~{entry:.0f}, стоп {sl:.0f} (за фитилём свипа), тейк {tp:.0f} (2R). "
+                               f"Риск 0.15% [ЭКСПЕРИМЕНТ SMC]"))
+                lines.append(f"BTC-SWP >>> {side.upper()} свип, вход ~{entry:.0f}")
+        else:
+            trend = 'бычий' if c > e200 else 'медвежий'
+            lines.append(f"BTC-SWP нет свипа: тренд {trend}, цена {c:.0f} (свинг {sw_lo:.0f}-{sw_hi:.0f})")
+    except Exception as ex:
+        lines.append(f'BTC-SWP ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_gold4h(state):
     lines, alerts = [], []
     try:
@@ -1498,6 +1553,12 @@ def main():
             alerts.extend(g4_alerts)
         except Exception as ex:
             lines.append(f'GOLD-4H ОШИБКА: {str(ex)[:60]}')
+    try:
+        sw_lines, sw_alerts = scan_btc4h_sweep(state)
+        lines.extend(sw_lines)
+        alerts.extend(sw_alerts)
+    except Exception as ex:
+        lines.append(f'BTC-SWP ОШИБКА: {str(ex)[:60]}')
     try:
         lo_lines, lo_alerts = scan_lottery(state)
         lines.extend(lo_lines)

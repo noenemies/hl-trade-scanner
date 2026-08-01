@@ -1426,61 +1426,17 @@ def main():
             lines.append(f'{coin:7} ОШИБКА: {str(ex)[:80]}')
     if not btc_only:
         try:
-            r = scan_spacex()
-            if r.get('status') == 'УРОВЕНЬ ПРОБИТ':
-                msg = f"SPCX    >>> ПРОБИТ {r['level']:g} | цена {r['price']:.2f} | {r['meaning']}"
-                alerts.append((f"SPCX:{r['level']:g}", r['bar_ts'],
-                               f"SPACEX пробил {r['level']:g} (цена {r['price']:.2f}): {r['meaning']}"))
-            else:
-                msg = f"SPCX    {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else '')
-            lines.append(msg)
-        except Exception as ex:
-            lines.append(f'SPCX    ОШИБКА: {str(ex)[:80]}')
-        try:
             sx_lines, sx_alerts = scan_spxmr(state)
             lines.extend(sx_lines)
             alerts.extend(sx_alerts)
         except Exception as ex:
             lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
-        try:
-            r = scan_purr()
-            if r.get('status') == 'СИГНАЛ':
-                msg = f"PURR    >>> {r['side']} | {r['meaning']}"
-                alerts.append((f"PURR:{r['side']}", r['bar_ts'], f"PURR {r['side']}: {r['meaning']}"))
-            else:
-                msg = f"PURR    {r.get('status', '?')}"
-            lines.append(msg)
-        except Exception as ex:
-            lines.append(f'PURR    ОШИБКА: {str(ex)[:80]}')
-        try:
-            r = scan_kzt()
-            if r.get('status') == 'УРОВЕНЬ ПРОБИТ':
-                msg = f"USDKZT  >>> ПРОБИТ {r['level']:g} | курс {r['price']:.1f} | {r['meaning']}"
-                alerts.append((f"USDKZT:{r['level']:g}", r['bar_ts'],
-                               f"USD/KZT пробил {r['level']:g} (курс {r['price']:.1f}): {r['meaning']}"))
-            else:
-                msg = f"USDKZT  {r.get('status', '?')}"
-            lines.append(msg)
-        except Exception as ex:
-            lines.append(f'USDKZT  ОШИБКА: {str(ex)[:80]}')
-    try:
-        cr_lines, cr_alerts = scan_crash_monitor()
-        lines.extend(cr_lines)
-        alerts.extend(cr_alerts)
-    except Exception as ex:
-        lines.append(f'CRASH   ОШИБКА: {str(ex)[:60]}')
     try:
         lo_lines, lo_alerts = scan_lottery(state)
         lines.extend(lo_lines)
         alerts.extend(lo_alerts)
     except Exception as ex:
         lines.append(f'LOTTO   ОШИБКА: {str(ex)[:60]}')
-    try:
-        lt_lines, lt_alerts = scan_longterm(state)
-        lines.extend(lt_lines)
-        alerts.extend(lt_alerts)
-    except Exception as ex:
-        lines.append(f'ДОЛГОСРОК ОШИБКА: {str(ex)[:60]}')
     for coin, pos in list(positions.items()):
         try:
             st = trail_position(coin, pos)
@@ -1547,9 +1503,7 @@ def main():
             senti += judgment_block(collect_sentiment_metrics())
         except Exception:
             pass
-        lt_note = monthly_report(state) + longterm_thesis_reminder(state)
-        lt_note = hlp_status_line() + lt_note
-        ok = send_telegram(f'📋 Утренняя сводка{late}\n' + report + cal + senti + spacex_events_block() + lt_note)
+        ok = send_telegram(f'📋 Утренняя сводка{late}\n' + report + cal + senti + monthly_report(state))
         if ok:
             state['daily_sent'] = today_iso
     if recap:

@@ -772,6 +772,69 @@ def scan_crash_monitor():
 SPXMR_RISK_ATR = 1.5
 
 
+# Модуль GOLD-4H: тренд-следование EMA20/50 (только лонги) + трейлинг 2.5xATR (добавлен 01.08.2026).
+# Бэктест GC=F->4h, 2 года: PF 2.01/1.79 по половинам (обе в плюсе), 26 сделок, win 38%, DD -5.9R.
+# Только лонги (ловит бычий тренд золота, не шортит). ЭКСПЕРИМЕНТ: тонкая выборка (~13 сделок/год),
+# риск 0.15%, пересмотр после 20 живых сделок. Данные - спот xyz:GOLD (цены как на пропе).
+GOLD4H_TRAIL = 2.5
+
+
+def scan_gold4h(state):
+    lines, alerts = [], []
+    try:
+        bars = fetch_hl_bars('xyz:GOLD', '4h', days=40)
+        if len(bars) < 55:
+            return ['GOLD-4H нет данных'], []
+        cl = [b[4] for b in bars]
+        e20 = ema(cl, 20); e50 = ema(cl, 50); a = atr(bars)
+        t, o, h, l, c = bars[-1]
+        pos = state.get('gold4h')
+        if pos:
+            # трейлинг вверх
+            if c > pos.get('best', pos['entry']):
+                pos['best'] = c
+                new_stop = c - GOLD4H_TRAIL * a
+                if new_stop > pos['stop']:
+                    pos['stop'] = new_stop
+                    key = 'gold4h:trail'
+                    if state.get(key) != round(new_stop, 1):
+                        alerts.append((key, round(new_stop, 1),
+                                       f"🔁 GOLD-4H: передвинь стоп на {new_stop:.1f} (цена {c:.1f}, "
+                                       f"{(c-pos['entry'])/pos['risk']:+.1f}R)"))
+            r_now = (c - pos['entry']) / pos['risk']
+            cross_down = e20[-1] < e50[-1]
+            hit = c <= pos['stop']
+            if hit or cross_down:
+                reason = 'трейлинг-стоп' if hit else 'EMA20<50 (разворот тренда)'
+                r_fin = (pos['stop'] - pos['entry']) / pos['risk'] if hit else r_now
+                journal_trade('GOLD-4H', {'side': 'long', 'entry': pos['entry'],
+                                          'entry_ts': pos['entry_ts']}, r_fin, reason)
+                alerts.append(('gold4h:close', pos['entry_ts'],
+                               f"🔚 GOLD-4H ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой лонг, если ещё в рынке."))
+                lines.append(f"GOLD-4H закрыт ({reason}): {r_fin:+.2f}R")
+                state['gold4h'] = None
+            else:
+                lines.append(f"GOLD-4H в лонге {r_now:+.1f}R, стоп {pos['stop']:.1f}")
+        else:
+            # крест вверх EMA20 над EMA50
+            if e20[-1] > e50[-1] and e20[-2] <= e50[-2]:
+                risk = GOLD4H_TRAIL * a
+                if risk > 0:
+                    state['gold4h'] = {'entry': c, 'stop': c - risk, 'best': c,
+                                       'risk': risk, 'entry_ts': t}
+                    alerts.append(('gold4h:entry', t,
+                                   f"🥇 GOLD-4H ЛОНГ (EMA20 пересёк EMA50 вверх): вход ~{c:.1f}, "
+                                   f"стоп {c-risk:.1f} (трейлинг 2.5xATR). Выход по трейлингу или EMA20<50. "
+                                   f"Риск 0.15% [ЭКСПЕРИМЕНТ]"))
+                    lines.append(f"GOLD-4H >>> ЛОНГ вход ~{c:.1f}")
+            else:
+                trend = 'бычий (EMA20>50)' if e20[-1] > e50[-1] else 'медвежий (EMA20<50) - вне рынка'
+                lines.append(f"GOLD-4H нет сигнала: тренд {trend}, цена {c:.1f}")
+    except Exception as ex:
+        lines.append(f'GOLD-4H ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_spxmr(state):
     """Состояния: нет -> pending (сигнал, ждём открытия) -> open -> closing -> журнал."""
     lines, alerts = [], []
@@ -1429,6 +1492,12 @@ def main():
             alerts.extend(sx_alerts)
         except Exception as ex:
             lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
+        try:
+            g4_lines, g4_alerts = scan_gold4h(state)
+            lines.extend(g4_lines)
+            alerts.extend(g4_alerts)
+        except Exception as ex:
+            lines.append(f'GOLD-4H ОШИБКА: {str(ex)[:60]}')
     try:
         lo_lines, lo_alerts = scan_lottery(state)
         lines.extend(lo_lines)

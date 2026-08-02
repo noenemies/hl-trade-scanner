@@ -1,9 +1,4 @@
 {
- "ETH": {
-  "side": "short",
-  "entry": 1866.1,
-  "entry_ts": 1785502800
- },
  "HYPE": {
   "side": "short",
   "entry": 52.282,

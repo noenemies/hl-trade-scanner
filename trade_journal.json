@@ -646,5 +646,23 @@
   "closed_ts": 1785630474.027416,
   "r": -0.18,
   "reason": "stop"
+ },
+ {
+  "coin": "BTC",
+  "side": "short",
+  "entry": 62982.0,
+  "opened_ts": 1785596400,
+  "closed_ts": 1785640588.453315,
+  "r": -1.0,
+  "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH",
+  "side": "short",
+  "entry": 1866.1,
+  "opened_ts": 1785502800,
+  "closed_ts": 1785640592.224011,
+  "r": 0.26,
+  "reason": "stop"
  }
 ]

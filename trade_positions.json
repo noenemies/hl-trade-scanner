@@ -3,5 +3,15 @@
   "side": "long",
   "entry": 485.01,
   "entry_ts": 1785697200
+ },
+ "ETH": {
+  "side": "long",
+  "entry": 1889.8,
+  "entry_ts": 1785704400
+ },
+ "SOL": {
+  "side": "long",
+  "entry": 73.95,
+  "entry_ts": 1785704400
  }
 }

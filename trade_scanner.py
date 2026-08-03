@@ -72,7 +72,7 @@ def fetch_hl_bars(coin, interval='1h', days=150, bar_sec=3600):
     return [b for b in bars if b[0] <= cutoff]
 
 
-HL_COINS = {'BTC', 'HYPE', 'ETH', 'SOL', 'ZEC'}
+HL_COINS = {'BTC', 'HYPE', 'ETH', 'SOL', 'ZEC'}  # для fetch (HYPE/SOL/ZEC ещё нужны др. модулям/отчётам)
 
 
 def fetch_any(symbol, days=150, interval='1h', bar_sec=3600):
@@ -260,7 +260,12 @@ def scan_day_pullback(name, symbol, always_open):
 #   SOL  (2 года): PF 1.16/1.19, N=394  | откатная свинг-система на альтах НЕ работает (PF<1)
 # Риск: ETH/SOL 0.15-0.2% (2 года данных), HYPE 0.1-0.15% (13 мес).
 HYPE_LOOKBACK, HYPE_ATR_TRAIL, HYPE_TIME_STOP_H = 48, 2.5, 120
-CRYPTO_BREAKOUT = ['HYPE', 'ETH', 'SOL', 'ZEC']   # ZEC эксперимент (7 мес, PF 2.96); BNB убран 18.07 по запросу
+# Валидация 02.08.2026 на максимальной истории (фреймворк btc_framework/):
+#   ETH  8.6 лет: PF 1.31, OOS 1.32->1.27, 9/10 лет+, MC 100%  -> ОСТАВЛЕН
+#   SOL  4.5 года: PF 1.01, OOS 0.83, 1/5 лет+, MC 54%         -> УБРАН (края нет)
+#   ZEC  4.5 года: PF 0.99, OOS 0.81, 2/5 лет+, MC 45%         -> УБРАН (PF 2.96 на 7 мес был артефактом)
+#   HYPE 0.6 года: OOS 1.32->0.64, истории для валидации нет    -> УБРАН
+CRYPTO_BREAKOUT = ['ETH']
 POSITIONS = Path(__file__).with_name('trade_positions.json')  # открытые позиции для ведения трейлинга
 JOURNAL = Path(__file__).with_name('trade_journal.json')       # архив закрытых сделок для месячной статистики
 

@@ -1176,6 +1176,78 @@ def scan_eth_4h(state):
     return lines, alerts
 
 
+# ===== SPX-MR2: три mean-reversion стратегии S&P500 (добавлены 03.08.2026) =====
+# Поиск на 56 ГОДАХ (1970-2026, 14266 дневных баров): 149 конфигов -> 22 робастных.
+# ВАЖНО: все трендследящие на индексе провалились (0 из 83) - работает только возврат к среднему.
+# Взяты три РАЗНЫХ триггера: осциллятор / глубина просадки / календарь.
+SPX_MR2 = {
+    'SPX-RSI5':  dict(kind='rsi',  th=5,   rr=2.0, stop=2.0, tstop=16),  # PF 2.03 OOS 2.28, 6/6 десятилетий
+    'SPX-DIP5':  dict(kind='dip',  pct=0.05, look=20, rr=2.0, stop=2.0, tstop=15),  # PF 1.94 OOS 1.94, 5/6
+    'SPX-TOM':   dict(kind='tom',  rr=None, stop=2.0, tstop=5),          # PF 1.33 OOS 1.23, 6/6, N=669
+}
+
+
+def scan_spx_mr2(state):
+    """Три MR-стратегии S&P500 на дневках. ТОЛЬКО ЛОНГИ (шорты на индексе не работают)."""
+    lines, alerts = [], []
+    try:
+        bars = fetch_bars('^GSPC', days=700, interval='1d', bar_sec=86400)
+        if len(bars) < 220:
+            return ['SPX-MR2 нет данных'], []
+        C = [b[4] for b in bars]; H = [b[2] for b in bars]; L = [b[3] for b in bars]
+        a = atr(bars)[-1]; t, o, h, l, c = bars[-1][:5]
+        i = len(bars) - 1
+        s200 = sum(C[-200:]) / 200
+        e200 = ema(C, 200)[-1]
+        r2 = rsi2(C)[-1]
+        import datetime as _dt
+        d_now = _dt.date.fromtimestamp(t)
+        for name, cfg in SPX_MR2.items():
+            key = f'spx2_{name}'
+            pos = state.get(key)
+            if pos:
+                r_now = (c - pos['entry']) / pos['risk']
+                hit = l <= pos['stop']
+                tp_hit = cfg['rr'] and h >= pos['entry'] + cfg['rr'] * pos['risk']
+                tstop = (t - pos['entry_ts']) >= cfg['tstop'] * 86400
+                if hit or tp_hit or tstop:
+                    reason = 'стоп' if hit else ('тейк ' + str(cfg['rr']) + 'R' if tp_hit else f"тайм-стоп {cfg['tstop']}д")
+                    r_fin = -1.0 if hit else (cfg['rr'] if tp_hit else r_now)
+                    journal_trade(name, {'side': 'long', 'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
+                    alerts.append((f'{key}:close', pos['entry_ts'],
+                        f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой лонг, если ещё в рынке."))
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                else:
+                    lines.append(f"{name} в лонге {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
+            else:
+                sig = 0
+                if cfg['kind'] == 'rsi':
+                    if r2 < cfg['th'] and c > e200: sig = 1
+                elif cfg['kind'] == 'dip':
+                    hh = max(H[i-cfg['look']:i])
+                    if c > s200 and c < hh * (1 - cfg['pct']): sig = 1
+                else:  # turn-of-month: последний торговый день месяца
+                    nxt = d_now + _dt.timedelta(days=1)
+                    while nxt.weekday() >= 5: nxt += _dt.timedelta(days=1)
+                    if nxt.month != d_now.month: sig = 1
+                if sig:
+                    risk = cfg['stop'] * a
+                    state[key] = {'entry': c, 'stop': c - risk, 'risk': risk, 'entry_ts': t}
+                    kindru = {'rsi': f"RSI2<{cfg.get('th')} выше EMA200",
+                              'dip': f"просадка {cfg.get('pct',0):.0%} от 20-дн максимума",
+                              'tom': 'поворот месяца'}[cfg['kind']]
+                    tp_txt = f", тейк {c + cfg['rr']*risk:,.0f} ({cfg['rr']}R)" if cfg['rr'] else ''
+                    alerts.append((f'{key}:entry', t,
+                        f"📈 {name} ЛОНГ ({kindru}): вход ~{c:,.0f}, стоп {c-risk:,.0f}{tp_txt}. "
+                        f"Риск 0.2% [56 лет: PF {1.33 if cfg['kind']=='tom' else 2.0:.1f}, 6/6 десятилетий]"))
+                    lines.append(f"{name} >>> ЛОНГ вход ~{c:,.0f}")
+                else:
+                    lines.append(f"{name} нет сигнала (RSI2 {r2:.0f}, цена {c:,.0f})")
+    except Exception as ex:
+        lines.append(f'SPX-MR2 ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_spxmr(state):
     """Состояния: нет -> pending (сигнал, ждём открытия) -> open -> closing -> журнал."""
     lines, alerts = [], []
@@ -1826,6 +1898,11 @@ def main():
         except Exception as ex:
             lines.append(f'{coin:7} ОШИБКА: {str(ex)[:80]}')
     if not btc_only:
+        try:
+            s2_lines, s2_alerts = scan_spx_mr2(state)
+            lines.extend(s2_lines); alerts.extend(s2_alerts)
+        except Exception as ex:
+            lines.append(f'SPX-MR2 ОШИБКА: {str(ex)[:60]}')
         try:
             sx_lines, sx_alerts = scan_spxmr(state)
             lines.extend(sx_lines)

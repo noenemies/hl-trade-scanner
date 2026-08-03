@@ -691,5 +691,32 @@
   "closed_ts": 1785701327.774136,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ZEC",
+  "side": "long",
+  "entry": 485.01,
+  "opened_ts": 1785697200,
+  "closed_ts": 1785723273.096383,
+  "r": -0.45,
+  "reason": "stop"
+ },
+ {
+  "coin": "ETH",
+  "side": "long",
+  "entry": 1889.8,
+  "opened_ts": 1785704400,
+  "closed_ts": 1785723273.291331,
+  "r": -1.0,
+  "reason": "stop"
+ },
+ {
+  "coin": "SOL",
+  "side": "long",
+  "entry": 73.95,
+  "opened_ts": 1785704400,
+  "closed_ts": 1785723273.442926,
+  "r": -1.0,
+  "reason": "stop"
  }
 ]

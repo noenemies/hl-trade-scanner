@@ -1001,6 +1001,96 @@ def scan_btc_4h(state):
     return lines, alerts
 
 
+# ===== BTC-1D: три дневные стратегии (добавлены 02.08.2026) =====
+# Фреймворк btc_framework/ на 14 годах (Bitstamp 2012-2026): 83 конфига -> 48 робастных.
+# Все три имеют 14/14 ПРИБЫЛЬНЫХ ЛЕТ и Monte Carlo P(profit)=100%.
+# Дневки мягче 4h: expectancy вдвое выше (+0.6..+0.8R), просадки вдвое меньше (-4..-8R).
+BTC1D = {
+    'BTCd-VOL':   dict(kind='vol',   look=40, volmult=1.5, stop=2.5, trail=3.0, tstop=60),  # PF 3.14 OOS 1.76
+    'BTCd-MOM':   dict(kind='mom',   look=20,               stop=2.0, trail=3.0, tstop=60), # PF 2.70 OOS 1.44
+    'BTCd-DONCH': dict(kind='donch', look=40,               stop=2.5, trail=2.5, tstop=60), # PF 2.66 OOS 1.47
+}
+
+
+def _btc1d_signal(cfg, bars):
+    """Сигнал по последнему ЗАКРЫТОМУ дневному бару (без look-ahead)."""
+    C = [b[4] for b in bars]; H = [b[2] for b in bars]; L = [b[3] for b in bars]
+    V = [b[5] if len(b) > 5 else 0 for b in bars]
+    lk = cfg['look']; i = len(bars) - 1
+    if i < max(lk + 2, 205):
+        return 0
+    if cfg['kind'] == 'vol':
+        vs = sum(V[i-20:i]) / 20 if V[i-20] else 0
+        if vs and V[i] < cfg['volmult'] * vs: return 0
+        if C[i] > max(H[i-lk:i]): return 1
+        if C[i] < min(L[i-lk:i]): return -1
+        return 0
+    if cfg['kind'] == 'mom':
+        s200 = sum(C[-200:]) / 200
+        chg = C[i] / C[i-lk] - 1
+        if chg > 0 and C[i] > s200: return 1
+        if chg < 0 and C[i] < s200: return -1
+        return 0
+    if cfg['kind'] == 'donch':
+        if C[i] > max(H[i-lk:i]): return 1
+        if C[i] < min(L[i-lk:i]): return -1
+    return 0
+
+
+def scan_btc_daily(state):
+    """Три дневные BTC-стратегии. Проверка раз в день, ~5-15 сделок в год."""
+    lines, alerts = [], []
+    try:
+        bars = fetch_hl_bars('BTC', '1d', days=400, bar_sec=86400)
+        if len(bars) < 210:
+            return ['BTC-1D  нет данных'], []
+        a = atr(bars)[-1]
+        t, o, h, l, c = bars[-1]
+        for name, cfg in BTC1D.items():
+            key = f'btc1d_{name}'
+            pos = state.get(key)
+            if pos:
+                d = pos['d']
+                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                    pos['best'] = c
+                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                        pos['stop'] = ns; tk = f'{key}:trail'
+                        if state.get(tk) != round(ns, 0):
+                            alerts.append((tk, round(ns, 0),
+                                f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                r_now = (c - pos['entry'])/pos['risk']*d
+                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                tstop = t - pos['entry_ts'] >= cfg['tstop']*86400
+                if hit or tstop:
+                    reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} дней"
+                    r_fin = (pos['stop']-pos['entry'])/pos['risk']*d if hit else r_now
+                    journal_trade(name, {'side': 'long' if d == 1 else 'short',
+                                         'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
+                    alerts.append((f'{key}:close', pos['entry_ts'],
+                        f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                else:
+                    lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
+            else:
+                d = _btc1d_signal(cfg, bars)
+                if d:
+                    risk = cfg['stop']*a
+                    state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
+                    side = 'ЛОНГ' if d == 1 else 'ШОРТ'
+                    kindru = {'vol': f"пробой {cfg['look']}д + объём", 'mom': f"импульс {cfg['look']}д",
+                              'donch': f"пробой канала {cfg['look']}д"}[cfg['kind']]
+                    alerts.append((f'{key}:entry', t,
+                        f"₿📅 {name} {side} ({kindru}): вход ~{c:,.0f}, стоп {c-d*risk:,.0f}, "
+                        f"трейлинг {cfg['trail']}xATR. Риск 0.2% [14 лет: 14/14 прибыльных, MC 100%]"))
+                    lines.append(f"{name} >>> {side} вход ~{c:,.0f}")
+                else:
+                    lines.append(f"{name} нет сигнала (цена {c:,.0f})")
+    except Exception as ex:
+        lines.append(f'BTC-1D  ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_spxmr(state):
     """Состояния: нет -> pending (сигнал, ждём открытия) -> open -> closing -> журнал."""
     lines, alerts = [], []
@@ -1658,6 +1748,11 @@ def main():
             alerts.extend(sx_alerts)
         except Exception as ex:
             lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
+        try:
+            bd_lines, bd_alerts = scan_btc_daily(state)
+            lines.extend(bd_lines); alerts.extend(bd_alerts)
+        except Exception as ex:
+            lines.append(f'BTC-1D  ОШИБКА: {str(ex)[:60]}')
         try:
             b4_lines, b4_alerts = scan_btc_4h(state)
             lines.extend(b4_lines); alerts.extend(b4_alerts)

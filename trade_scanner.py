@@ -13,9 +13,10 @@ from pathlib import Path
 
 ASSETS = {
     # имя: (тикер, круглосуточно, безубыток на +1.5R)
-    # металлы: спот xyz:* с Hyperliquid (совпадает с XAU/XAG на пропе), НЕ фьючерсы COMEX
+    # GOLD убран 02.08.2026: 14-летний тест дал PF 1.13 при DD -38R (против GOLD-D PF 1.40 / DD -9R),
+    # плюс на 1h (таймфрейм входа свинга) края нет вообще - 131 конфиг за 13 лет, 0 робастных.
+    # Золото теперь ведёт ТОЛЬКО модуль GOLD-D (Donchian20+ADX25, 4h).
     'BTC':    ('BTC',        True,  True),   # данные с Hyperliquid (Yahoo 429)
-    'GOLD':   ('xyz:GOLD',   False, True),
     'SILVER': ('xyz:SILVER', False, False),
 }
 ATR_SL, RR, SESSION_UTC = 2.0, 3.0, (12, 20)

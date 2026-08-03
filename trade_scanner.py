@@ -844,6 +844,74 @@ def scan_gold_donch(state):
     return lines, alerts
 
 
+# ===== GOLD-D1: дневные пробойные модули (добавлены 02.08.2026) =====
+# Exhaustive-поиск: 70 дневных конфигов x 14 лет -> 27 робастных (против 0 из 131 на 1h!).
+# Край золота растёт с таймфреймом: 1h нет, 4h PF 1.40, 1d PF 2.5+. Out-of-sample ЛУЧШЕ in-sample.
+# Три конфига с разным горизонтом пробоя (не дубли): D10 быстрый / D20 базовый / D55 медленный.
+GOLD_D1 = {
+    'GOLD-D20': dict(look=20, adx=20, trail=2.0, stop=2.5),  # PF 2.52, 13/14 лет, DD -2.6R (лучшая консистентность)
+    'GOLD-D55': dict(look=55, adx=20, trail=2.0, stop=2.5),  # PF 2.89, 11/14 лет (лучший PF, редкие сделки)
+    'GOLD-D10': dict(look=10, adx=20, trail=2.0, stop=2.5),  # PF 2.03, 12/14 лет, N=113 (больше выборка)
+}
+
+
+def scan_gold_daily(state):
+    """Дневные пробои золота. Проверка раз в день по закрытым дневным барам."""
+    lines, alerts = [], []
+    try:
+        bars = fetch_hl_bars('xyz:GOLD', '1d', days=400, bar_sec=86400)
+        if len(bars) < 80:
+            return ['GOLD-D1 нет данных'], []
+        a = atr(bars); adx_now = _adx(bars)
+        t, o, h, l, c = bars[-1]
+        for name, cfg in GOLD_D1.items():
+            key = f'gd_{name}'
+            pos = state.get(key)
+            if pos:
+                d = pos['d']
+                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                    pos['best'] = c
+                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                        pos['stop'] = ns; tk = f'{key}:trail'
+                        if state.get(tk) != round(ns, 1):
+                            alerts.append((tk, round(ns, 1),
+                                f"🔁 {name}: передвинь стоп на {ns:.1f} (цена {c:.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                r_now = (c - pos['entry'])/pos['risk']*d
+                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                tstop = t - pos['entry_ts'] >= 40*86400
+                if hit or tstop:
+                    reason = 'трейлинг-стоп' if hit else 'тайм-стоп 40 дней'
+                    r_fin = (pos['stop']-pos['entry'])/pos['risk']*d if hit else r_now
+                    journal_trade(name, {'side': 'long' if d == 1 else 'short',
+                                         'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
+                    alerts.append((f'{key}:close', pos['entry_ts'],
+                        f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                else:
+                    lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:.1f}")
+            else:
+                if adx_now < cfg['adx']:
+                    lines.append(f"{name} вне рынка (ADX {adx_now:.0f}<{cfg['adx']})")
+                    continue
+                lk = cfg['look']
+                hh = max(b[2] for b in bars[-lk-1:-1]); ll = min(b[3] for b in bars[-lk-1:-1])
+                d = 1 if c > hh else (-1 if c < ll else 0)
+                if d:
+                    risk = cfg['stop']*a
+                    state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
+                    side = 'ЛОНГ' if d == 1 else 'ШОРТ'
+                    alerts.append((f'{key}:entry', t,
+                        f"🥇 {name} {side} (дневной пробой {lk} баров, ADX {adx_now:.0f}): вход ~{c:.1f}, "
+                        f"стоп {c-d*risk:.1f}, трейлинг {cfg['trail']}xATR. Риск 0.2% [14 лет: PF 2.0-2.9]"))
+                    lines.append(f"{name} >>> {side} вход ~{c:.1f}")
+                else:
+                    lines.append(f"{name} внутри канала ({ll:.0f}-{hh:.0f}), цена {c:.1f}")
+    except Exception as ex:
+        lines.append(f'GOLD-D1 ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_spxmr(state):
     """Состояния: нет -> pending (сигнал, ждём открытия) -> open -> closing -> журнал."""
     lines, alerts = [], []
@@ -1501,6 +1569,11 @@ def main():
             alerts.extend(sx_alerts)
         except Exception as ex:
             lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
+        try:
+            gd_lines, gd_alerts = scan_gold_daily(state)
+            lines.extend(gd_lines); alerts.extend(gd_alerts)
+        except Exception as ex:
+            lines.append(f'GOLD-D1 ОШИБКА: {str(ex)[:60]}')
         try:
             g4_lines, g4_alerts = scan_gold_donch(state)
             lines.extend(g4_lines)

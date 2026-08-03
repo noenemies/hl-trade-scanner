@@ -43,8 +43,9 @@ def fetch_bars(symbol, days=150, interval='1h', bar_sec=3600):
     d = json.load(urllib.request.urlopen(req, timeout=30, context=CTX))
     res = d['chart']['result'][0]
     q = res['indicators']['quote'][0]
-    bars = [(t, o, h, l, c) for t, o, h, l, c in
-            zip(res['timestamp'], q['open'], q['high'], q['low'], q['close'])
+    vols = q.get('volume') or [0] * len(res['timestamp'])
+    bars = [(t, o, h, l, c, float(v or 0)) for t, o, h, l, c, v in
+            zip(res['timestamp'], q['open'], q['high'], q['low'], q['close'], vols)
             if None not in (o, h, l, c)]
     # последний бар может быть незакрытым - отбрасываем, работаем по закрытым
     now = dt.datetime.now().timestamp()
@@ -66,7 +67,8 @@ def fetch_hl_bars(coin, interval='1h', days=150, bar_sec=3600):
     req = urllib.request.Request('https://api.hyperliquid.xyz/info', data=body,
                                  headers={'Content-Type': 'application/json'})
     d = json.load(urllib.request.urlopen(req, timeout=30, context=CTX))
-    bars = sorted((c['t'] // 1000, float(c['o']), float(c['h']), float(c['l']), float(c['c']))
+    bars = sorted((c['t'] // 1000, float(c['o']), float(c['h']), float(c['l']), float(c['c']),
+                   float(c.get('v', 0)))
                   for c in d)
     cutoff = dt.datetime.now().timestamp() - bar_sec
     return [b for b in bars if b[0] <= cutoff]
@@ -91,7 +93,8 @@ def ema(vals, n):
 
 def atr(bars, n=14):
     out, prev_c, a = [], None, None
-    for _, o, h, l, c in bars:
+    for b in bars:
+        _, o, h, l, c = b[:5]
         tr = h - l if prev_c is None else max(h - l, abs(h - prev_c), abs(l - prev_c))
         a = tr if a is None else (a * (n - 1) + tr) / n
         out.append(a)
@@ -120,7 +123,7 @@ def scan(name, symbol, always_open, use_be):
     closes = [b[4] for b in bars]
     e20 = ema(closes, 20)[-1]
     a = atr(bars)[-1]
-    t, o, h, l, c = bars[-1]  # последний ЗАКРЫТЫЙ 1h бар
+    t, o, h, l, c = bars[-1][:5]  # последний ЗАКРЫТЫЙ 1h бар
     hour_utc = dt.datetime.fromtimestamp(t, dt.timezone.utc).hour
     in_session = always_open or (SESSION_UTC[0] <= hour_utc <= SESSION_UTC[1])
 
@@ -172,7 +175,7 @@ def scan_nq_daytrade():
     r2 = rsi2(closes)[-1]
     e200 = ema(closes, 200)[-1]
     a = atr(bars)[-1]
-    t, o, h, l, c = bars[-1]
+    t, o, h, l, c = bars[-1][:5]
     h_ct = dt.datetime.fromtimestamp(t, ZoneInfo('America/Chicago')).hour
     out = {'name': 'NQ-MR', 'price': c, 'rsi2': r2, 'ema200': e200, 'hour_ct': h_ct}
     # базис фьючерс-индекс: пользователь торгует/смотрит индекс NASDAQ, сигнал считается по NQ
@@ -228,7 +231,7 @@ def scan_day_pullback(name, symbol, always_open):
           for i in range(0, len(bars)-1, 2)]
     c1 = [b[4] for b in h1]
     e50h, e200h = ema(c1, 50)[-1], ema(c1, 200)[-1]
-    t, o, h, l, c = bars[-1]
+    t, o, h, l, c = bars[-1][:5]
     if e50h > e200h and c1[-1] > e50h: tr = 1
     elif e50h < e200h and c1[-1] < e50h: tr = -1
     else: tr = 0
@@ -409,7 +412,7 @@ def trail_position(coin, pos):
     best = entry
     event = None
     for i in range(i0 + 1, len(bars)):
-        t, o, h, l, c = bars[i]
+        t, o, h, l, c = bars[i][:5]
         if (d == 1 and l <= stop) or (d == -1 and h >= stop):
             event = 'stop_hit'
             break
@@ -808,7 +811,7 @@ def scan_gold_donch(state):
         if len(bars) < GOLDD_LOOK+30:
             return ['GOLD-D  нет данных'], []
         a = atr(bars); adx_now = _adx(bars)
-        t,o,h,l,c = bars[-1]
+        t,o,h,l,c = bars[-1][:5]
         hh = max(b[2] for b in bars[-GOLDD_LOOK-1:-1]); ll = min(b[3] for b in bars[-GOLDD_LOOK-1:-1])
         pos = state.get('goldd')
         if pos:
@@ -868,7 +871,7 @@ def scan_gold_daily(state):
         if len(bars) < 80:
             return ['GOLD-D1 нет данных'], []
         a = atr(bars); adx_now = _adx(bars)
-        t, o, h, l, c = bars[-1]
+        t, o, h, l, c = bars[-1][:5]
         for name, cfg in GOLD_D1.items():
             key = f'gd_{name}'
             pos = state.get(key)
@@ -961,7 +964,7 @@ def scan_btc_4h(state):
         if len(bars) < 220:
             return ['BTC-4H  нет данных'], []
         a = atr(bars)[-1]; adx_now = _adx(bars)
-        t, o, h, l, c = bars[-1]
+        t, o, h, l, c = bars[-1][:5]
         for name, cfg in BTC4H.items():
             key = f'btc4_{name}'
             pos = state.get(key)
@@ -1050,7 +1053,7 @@ def scan_btc_daily(state):
         if len(bars) < 210:
             return ['BTC-1D  нет данных'], []
         a = atr(bars)[-1]
-        t, o, h, l, c = bars[-1]
+        t, o, h, l, c = bars[-1][:5]
         for name, cfg in BTC1D.items():
             key = f'btc1d_{name}'
             pos = state.get(key)
@@ -1115,7 +1118,7 @@ def scan_eth_4h(state):
         if len(bars) < 220:
             return ['ETH-4H  нет данных'], []
         a = atr(bars)[-1]
-        t, o, h, l, c = bars[-1]
+        t, o, h, l, c = bars[-1][:5]
         C = [b[4] for b in bars]; H = [b[2] for b in bars]; L = [b[3] for b in bars]
         V = [b[5] if len(b) > 5 else 0 for b in bars]
         i = len(bars) - 1
@@ -1188,7 +1191,7 @@ def scan_spxmr(state):
         ma200 = sum(closes[-200:]) / 200
         r2 = rsi2(closes[-30:])[-1]
         a14 = atr(bars)[-1]
-        t, o, h, l, c = bars[-1]
+        t, o, h, l, c = bars[-1][:5]
         ibs = (c - l) / (h - l) if h > l else 0.5
         basis = 0.0
         try:
@@ -1490,7 +1493,7 @@ def scan_breakout(coin):
     if len(bars) < HYPE_LOOKBACK + 20:
         return {'name': coin, 'status': 'нет данных'}
     a = atr(bars)[-1]
-    t, o, h, l, c = bars[-1]
+    t, o, h, l, c = bars[-1][:5]
     hh = max(b[2] for b in bars[-HYPE_LOOKBACK-1:-1])
     ll = min(b[3] for b in bars[-HYPE_LOOKBACK-1:-1])
     out = {'name': coin, 'price': c}

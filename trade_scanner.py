@@ -11,14 +11,10 @@ import json, ssl, sys, subprocess, urllib.request
 import datetime as dt
 from pathlib import Path
 
-ASSETS = {
-    # имя: (тикер, круглосуточно, безубыток на +1.5R)
-    # GOLD убран 02.08.2026: 14-летний тест дал PF 1.13 при DD -38R (против GOLD-D PF 1.40 / DD -9R),
-    # плюс на 1h (таймфрейм входа свинга) края нет вообще - 131 конфиг за 13 лет, 0 робастных.
-    # Золото теперь ведёт ТОЛЬКО модуль GOLD-D (Donchian20+ADX25, 4h).
-    'BTC':    ('BTC',        True,  True),   # данные с Hyperliquid (Yahoo 429)
-    'SILVER': ('xyz:SILVER', False, False),
-}
+# СВИНГ-МОДУЛЬ УДАЛЁН 02.08.2026 по запросу: валидация была только на 2 годах.
+# Все 2-летние валидации при полной проверке проваливались (золото-свинг, GOLD-DT, SOL, ZEC).
+# Крипта теперь ведётся модулями BTC-4h/BTC-1d/ETH-4h (8.6-14 лет истории).
+ASSETS = {}
 ATR_SL, RR, SESSION_UTC = 2.0, 3.0, (12, 20)
 
 # Модуль дейтрейдинга NASDAQ: mean reversion по RSI(2) с фильтром EMA200(1h).
@@ -1713,8 +1709,7 @@ def main():
         else:
             lines.append(f"{name:7} {r.get('status', '?')}" + (f" | цена {r['price']:.2f}" if 'price' in r else ''))
     try:
-        if btc_only:
-            raise StopIteration
+        raise StopIteration   # NQ-MR УДАЛЁН 02.08.2026: валидация только 2 года
         r = scan_nq_daytrade()
         nqpos = state.get('nqmr')
         c_nq, r2_nq, h_nq = r.get('price'), r.get('rsi2'), r.get('hour_ct')

@@ -867,7 +867,7 @@ def scan_gold_daily(state):
     """Дневные пробои золота. Проверка раз в день по закрытым дневным барам."""
     lines, alerts = [], []
     try:
-        bars = fetch_hl_bars('xyz:GOLD', '1d', days=400, bar_sec=86400)
+        bars = fetch_hl_bars('xyz:GOLD', '1d', days=650, bar_sec=86400)
         if len(bars) < 80:
             return ['GOLD-D1 нет данных'], []
         a = atr(bars); adx_now = _adx(bars)
@@ -886,7 +886,7 @@ def scan_gold_daily(state):
                             alerts.append((tk, round(ns, 1),
                                 f"🔁 {name}: передвинь стоп на {ns:.1f} (цена {c:.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= 40*86400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else 'тайм-стоп 40 дней'
@@ -979,7 +979,7 @@ def scan_btc_4h(state):
                             alerts.append((tk, round(ns, 0),
                                 f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= cfg['tstop']*14400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} баров"
@@ -1049,7 +1049,7 @@ def scan_btc_daily(state):
     """Три дневные BTC-стратегии. Проверка раз в день, ~5-15 сделок в год."""
     lines, alerts = [], []
     try:
-        bars = fetch_hl_bars('BTC', '1d', days=400, bar_sec=86400)
+        bars = fetch_hl_bars('BTC', '1d', days=650, bar_sec=86400)
         if len(bars) < 210:
             return ['BTC-1D  нет данных'], []
         a = atr(bars)[-1]
@@ -1068,7 +1068,7 @@ def scan_btc_daily(state):
                             alerts.append((tk, round(ns, 0),
                                 f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= cfg['tstop']*86400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} дней"
@@ -1136,7 +1136,7 @@ def scan_eth_4h(state):
                             alerts.append((tk, round(ns, 1),
                                 f"🔁 {name}: передвинь стоп на {ns:,.1f} (цена {c:,.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= cfg['tstop']*14400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} баров"

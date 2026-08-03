@@ -912,6 +912,95 @@ def scan_gold_daily(state):
     return lines, alerts
 
 
+# ===== BTC-4H: три робастные стратегии (добавлены 02.08.2026) =====
+# Фреймворк btc_framework/: 14 лет Bitstamp (120898 свечей 2012-2026), 85 конфигов -> 53 робастных.
+# Валидация: OOS-split 70/30, Monte Carlo 2000 сим (P(profit)=100%), sensitivity-плато, погодовая.
+# Взяты ТРИ РАЗНЫХ механизма (не клоны): структура / импульс / фильтрованный пробой.
+BTC4H = {
+    'BTC-BOS':  dict(kind='bos',  look=20, stop=2.0, trail=3.0, tstop=60),   # PF 2.27 OOS 1.58, 14/15 лет
+    'BTC-MOM':  dict(kind='mom',  look=50, stop=2.0, trail=3.0, tstop=60),   # PF 1.87 OOS 1.49, 15/15 лет
+    'BTC-DONCH':dict(kind='donch',look=40, adx=25, stop=2.5, trail=3.0, tstop=60),  # PF 2.51 OOS 1.67
+}
+
+
+def _btc_signal(cfg, bars, adx_now):
+    """Сигнал по ПОСЛЕДНЕМУ ЗАКРЫТОМУ бару. Возвращает +1/-1/0 (без look-ahead)."""
+    C = [b[4] for b in bars]; H = [b[2] for b in bars]; L = [b[3] for b in bars]
+    lk = cfg['look']; i = len(bars) - 1
+    if i < max(lk + 2, 210):
+        return 0
+    e200 = ema(C, 200)[-1]
+    if cfg['kind'] == 'bos':
+        hi = max(H[i-lk:i-1]); lo = min(L[i-lk:i-1])
+        if C[i] > hi and C[i-1] <= hi and C[i] > e200: return 1
+        if C[i] < lo and C[i-1] >= lo and C[i] < e200: return -1
+        return 0
+    if cfg['kind'] == 'mom':
+        s200 = sum(C[-200:]) / 200
+        chg = C[i] / C[i-lk] - 1
+        if chg > 0 and C[i] > s200: return 1
+        if chg < 0 and C[i] < s200: return -1
+        return 0
+    if cfg['kind'] == 'donch':
+        if adx_now < cfg.get('adx', 0): return 0
+        if C[i] > max(H[i-lk:i]): return 1
+        if C[i] < min(L[i-lk:i]): return -1
+    return 0
+
+
+def scan_btc_4h(state):
+    """Три BTC-стратегии на 4h. Полный цикл: вход -> трейлинг -> закрытие -> журнал."""
+    lines, alerts = [], []
+    try:
+        bars = fetch_hl_bars('BTC', '4h', days=120, bar_sec=14400)
+        if len(bars) < 220:
+            return ['BTC-4H  нет данных'], []
+        a = atr(bars)[-1]; adx_now = _adx(bars)
+        t, o, h, l, c = bars[-1]
+        for name, cfg in BTC4H.items():
+            key = f'btc4_{name}'
+            pos = state.get(key)
+            if pos:
+                d = pos['d']
+                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                    pos['best'] = c
+                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                        pos['stop'] = ns; tk = f'{key}:trail'
+                        if state.get(tk) != round(ns, 0):
+                            alerts.append((tk, round(ns, 0),
+                                f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                r_now = (c - pos['entry'])/pos['risk']*d
+                hit = (c <= pos['stop']) if d == 1 else (c >= pos['stop'])
+                tstop = t - pos['entry_ts'] >= cfg['tstop']*14400
+                if hit or tstop:
+                    reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} баров"
+                    r_fin = (pos['stop']-pos['entry'])/pos['risk']*d if hit else r_now
+                    journal_trade(name, {'side': 'long' if d == 1 else 'short',
+                                         'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
+                    alerts.append((f'{key}:close', pos['entry_ts'],
+                        f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                else:
+                    lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
+            else:
+                d = _btc_signal(cfg, bars, adx_now)
+                if d:
+                    risk = cfg['stop']*a
+                    state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
+                    side = 'ЛОНГ' if d == 1 else 'ШОРТ'
+                    kindru = {'bos': 'слом структуры', 'mom': 'импульс', 'donch': 'пробой канала'}[cfg['kind']]
+                    alerts.append((f'{key}:entry', t,
+                        f"₿ {name} {side} ({kindru} {cfg['look']}): вход ~{c:,.0f}, стоп {c-d*risk:,.0f}, "
+                        f"трейлинг {cfg['trail']}xATR. Риск 0.2% [14 лет: PF 1.9-2.5, OOS 1.5-1.7]"))
+                    lines.append(f"{name} >>> {side} вход ~{c:,.0f}")
+                else:
+                    lines.append(f"{name} нет сигнала (цена {c:,.0f}, ADX {adx_now:.0f})")
+    except Exception as ex:
+        lines.append(f'BTC-4H  ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
+
 def scan_spxmr(state):
     """Состояния: нет -> pending (сигнал, ждём открытия) -> open -> closing -> журнал."""
     lines, alerts = [], []
@@ -1569,6 +1658,11 @@ def main():
             alerts.extend(sx_alerts)
         except Exception as ex:
             lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
+        try:
+            b4_lines, b4_alerts = scan_btc_4h(state)
+            lines.extend(b4_lines); alerts.extend(b4_alerts)
+        except Exception as ex:
+            lines.append(f'BTC-4H  ОШИБКА: {str(ex)[:60]}')
         try:
             gd_lines, gd_alerts = scan_gold_daily(state)
             lines.extend(gd_lines); alerts.extend(gd_alerts)

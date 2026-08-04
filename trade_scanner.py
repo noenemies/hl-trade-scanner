@@ -1186,6 +1186,57 @@ SPX_MR2 = {
     'SPX-TOM':   dict(kind='tom',  rr=None, stop=2.0, tstop=5),          # PF 1.33 OOS 1.23, 6/6, N=669
 }
 
+# NASDAQ: поиск на 40.8 годах NDX (1985-2026) -> 4 робастных из 68; трендследящие снова 0.
+# Победитель выбран КРОСС-ВАЛИДАЦИЕЙ на трёх индексах (NDX / Composite 55 лет / S&P 56 лет):
+#   IBS<0.05: NDX PF 1.42 OOS 1.67 (5/5 дес) | IXIC 1.71/1.77 (5/5) | SPX 1.52/1.51 (5/6)
+#   единственная, стабильная на ВСЕХ трёх -> не подгонка под один индекс.
+# IBS = положение закрытия внутри дневного диапазона; <0.05 = закрытие у самого минимума дня.
+NDX_MR = {'NDX-IBS': dict(th=0.05, rr=1.5, stop=2.0, tstop=10)}
+
+
+def scan_ndx_mr(state):
+    """NASDAQ mean-reversion: закрытие у минимума дня в бычьем режиме. ТОЛЬКО ЛОНГИ."""
+    lines, alerts = [], []
+    try:
+        bars = fetch_bars('^NDX', days=700, interval='1d', bar_sec=86400)
+        if len(bars) < 220:
+            return ['NDX-MR  нет данных'], []
+        C = [b[4] for b in bars]
+        a = atr(bars)[-1]; t, o, h, l, c = bars[-1][:5]
+        s200 = sum(C[-200:]) / 200
+        ibs = (c - l) / (h - l) if h > l else 0.5
+        for name, cfg in NDX_MR.items():
+            key = f'ndxmr_{name}'
+            pos = state.get(key)
+            if pos:
+                r_now = (c - pos['entry']) / pos['risk']
+                hit = l <= pos['stop']
+                tp_hit = h >= pos['entry'] + cfg['rr'] * pos['risk']
+                tstop = (t - pos['entry_ts']) >= cfg['tstop'] * 86400
+                if hit or tp_hit or tstop:
+                    reason = 'стоп' if hit else (f"тейк {cfg['rr']}R" if tp_hit else f"тайм-стоп {cfg['tstop']}д")
+                    r_fin = -1.0 if hit else (cfg['rr'] if tp_hit else r_now)
+                    journal_trade(name, {'side': 'long', 'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
+                    alerts.append((f'{key}:close', pos['entry_ts'],
+                        f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой лонг, если ещё в рынке."))
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                else:
+                    lines.append(f"{name} в лонге {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
+            else:
+                if ibs < cfg['th'] and c > s200:
+                    risk = cfg['stop'] * a
+                    state[key] = {'entry': c, 'stop': c - risk, 'risk': risk, 'entry_ts': t}
+                    alerts.append((f'{key}:entry', t,
+                        f"📉 {name} ЛОНГ (закрытие у минимума дня, IBS {ibs:.2f}, выше SMA200): "
+                        f"вход ~{c:,.0f}, стоп {c-risk:,.0f}, тейк {c+cfg['rr']*risk:,.0f} ({cfg['rr']}R). "
+                        f"Риск 0.2% [кросс-валидация на 3 индексах, 40-55 лет]"))
+                    lines.append(f"{name} >>> ЛОНГ вход ~{c:,.0f}")
+                else:
+                    lines.append(f"{name} нет сигнала (IBS {ibs:.2f}, нужно <{cfg['th']})")
+    except Exception as ex:
+        lines.append(f'NDX-MR  ОШИБКА: {str(ex)[:60]}')
+    return lines, alerts
+
 
 def scan_spx_mr2(state):
     """Три MR-стратегии S&P500 на дневках. ТОЛЬКО ЛОНГИ (шорты на индексе не работают)."""
@@ -1898,6 +1949,11 @@ def main():
         except Exception as ex:
             lines.append(f'{coin:7} ОШИБКА: {str(ex)[:80]}')
     if not btc_only:
+        try:
+            nm_lines, nm_alerts = scan_ndx_mr(state)
+            lines.extend(nm_lines); alerts.extend(nm_alerts)
+        except Exception as ex:
+            lines.append(f'NDX-MR  ОШИБКА: {str(ex)[:60]}')
         try:
             s2_lines, s2_alerts = scan_spx_mr2(state)
             lines.extend(s2_lines); alerts.extend(s2_alerts)

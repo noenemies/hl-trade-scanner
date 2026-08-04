@@ -2052,17 +2052,28 @@ def main():
     except Exception:
         pass
     # дедупликация: не слать повторно тот же сигнал (актив+направление) по тому же бару
-    fresh = [txt for key, ts, txt in alerts if state.get(key) != ts]
-    for key, ts, _ in alerts:
-        state[key] = ts
+    fresh_items = [(key, ts, txt) for key, ts, txt in alerts if state.get(key) != ts]
+    fresh = [t for _, _, t in fresh_items]
     if fresh:
         import os as _os
         text = '; '.join(fresh).replace('"', "'")
         if sys.platform == 'darwin' and not _os.environ.get('CI'):
             subprocess.run(['osascript', '-e',
-                            f'display notification "{text}" with title "Сетап: 4H тренд / 1H откат" sound name "Glass"'],
+                            f'display notification "{text}" with title "Сетап сканера" sound name "Glass"'],
                            check=False)
-        send_telegram('🎯 СЕТАП\n' + '\n'.join(fresh))
+        delivered = send_telegram('🎯 СЕТАП\n' + '\n'.join(fresh))
+        # ВАЖНО: метим как отправленное ТОЛЬКО после успешной доставки,
+        # иначе неудачная отправка (нет конфига / сеть) теряет алерт навсегда.
+        if delivered:
+            for key, ts, _ in fresh_items:
+                state[key] = ts
+        else:
+            with open(LOG, 'a') as f:
+                f.write(f'[alerts] НЕ ДОСТАВЛЕНО {len(fresh)} шт, повтор в следующем прогоне\n')
+    # повторы (не fresh) всегда считаем обработанными
+    for key, ts, _ in alerts:
+        if state.get(key) is None and not any(k == key for k, _, _ in fresh_items):
+            state[key] = ts
     if daily:
         try:
             cal = format_calendar(fetch_calendar())

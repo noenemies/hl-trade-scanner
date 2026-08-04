@@ -347,9 +347,13 @@ def monthly_report(state):
     state['monthly_report'] = tag
     if not rows:
         return f'\n\n📊 Отчёт за {prev_month}: закрытых сделок не было.'
-    cats = {'🪙 Крипта': {'BTC', 'ETH', 'SOL', 'HYPE', 'ZEC', 'BNB', 'BTC-DT'},
-            '🥇 Металлы': {'GOLD', 'SILVER', 'GOLD-DT'},
-            '📈 Индексы': {'NASDAQ', 'SP500'}}
+    # префиксная категоризация: покрывает ЛЮБЫЕ имена модулей, включая будущие
+    def category(coin):
+        c = coin.upper()
+        if c.startswith(('BTC', 'ETH', 'SOL', 'HYPE', 'ZEC', 'BNB')): return '🪙 Крипта'
+        if c.startswith(('GOLD', 'SILVER', 'XAU', 'XAG')): return '🥇 Металлы'
+        if c.startswith(('SPX', 'SP500', 'NDX', 'NASDAQ', 'NQ')): return '📈 Индексы'
+        return '📦 Прочее'
     def block(rs):
         plus = sum(1 for x in rs if x > 0); w = [x for x in rs if x > 0.05]; l = [x for x in rs if x < -0.05]
         pf = (sum(w) / abs(sum(l))) if l else 99
@@ -357,8 +361,12 @@ def monthly_report(state):
     by = {}
     for t in rows:
         by.setdefault(t['coin'], []).append(t['r'])
+    cats = {}
+    for c in by:
+        cats.setdefault(category(c), set()).add(c)
     lines = [f'\n\n📊 ОТЧЁТ за {prev_month} ({len(rows)} сделок):']
-    for cat, members in cats.items():
+    for cat in sorted(cats):
+        members = cats[cat]
         cat_coins = [c for c in by if c in members]
         if not cat_coins:
             continue
@@ -368,15 +376,20 @@ def monthly_report(state):
         for coin in sorted(cat_coins, key=lambda c: -sum(by[c])):
             cp, cm, ct, _ = block(by[coin])
             lines.append(f'   {coin}: {cp}+ / {cm}-  {ct:+.1f}R')
-    # прочее (что не попало в категории)
-    other = [c for c in by if not any(c in mm for mm in cats.values())]
-    if other:
-        ors = [r for c in other for r in by[c]]
-        p, m, tot, pf = block(ors)
-        lines.append(f'📦 Прочее: {p}+ / {m}-, {tot:+.1f}R')
     allr = [t['r'] for t in rows]
     p, m, tot, pf = block(allr)
     lines.append(f'━━ ИТОГО: {p}+ / {m}-, {tot:+.1f}R, PF {pf:.2f}, win {p/len(allr):.0%}')
+    # открытые на момент отчёта позиции (по всем модулям)
+    live = []
+    for k, v in state.items():
+        if isinstance(v, dict) and 'entry' in v and v.get('entry_ts'):
+            nm = k.split('_')[-1] if '_' in k else k
+            side = 'лонг' if v.get('d', 1) == 1 else 'шорт'
+            live.append(f"{nm} {side} от {v['entry']:,.0f}")
+    for coin, pos in (load_positions() or {}).items():
+        live.append(f"{coin} {'лонг' if pos.get('side')=='long' else 'шорт'} от {pos.get('entry',0):,.0f}")
+    if live:
+        lines.append('\n🔓 Открыто на 1-е число: ' + '; '.join(live))
     return '\n'.join(lines)
 
 

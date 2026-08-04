@@ -1961,6 +1961,31 @@ def main():
             lines.append(msg)
         except Exception as ex:
             lines.append(f'{coin:7} ОШИБКА: {str(ex)[:80]}')
+    try:
+        e4_lines, e4_alerts = scan_eth_4h(state)
+        lines.extend(e4_lines); alerts.extend(e4_alerts)
+    except Exception as ex:
+        lines.append(f'ETH-4H  ОШИБКА: {str(ex)[:60]}')
+    try:
+        bd_lines, bd_alerts = scan_btc_daily(state)
+        lines.extend(bd_lines); alerts.extend(bd_alerts)
+    except Exception as ex:
+        lines.append(f'BTC-1D  ОШИБКА: {str(ex)[:60]}')
+    try:
+        b4_lines, b4_alerts = scan_btc_4h(state)
+        lines.extend(b4_lines); alerts.extend(b4_alerts)
+    except Exception as ex:
+        lines.append(f'BTC-4H  ОШИБКА: {str(ex)[:60]}')
+    try:
+        gd_lines, gd_alerts = scan_gold_daily(state)
+        lines.extend(gd_lines); alerts.extend(gd_alerts)
+    except Exception as ex:
+        lines.append(f'GOLD-D1 ОШИБКА: {str(ex)[:60]}')
+    try:
+        g4_lines, g4_alerts = scan_gold_donch(state)
+        lines.extend(g4_lines); alerts.extend(g4_alerts)
+    except Exception as ex:
+        lines.append(f'GOLD-4H ОШИБКА: {str(ex)[:60]}')
     if not btc_only:
         try:
             nm_lines, nm_alerts = scan_ndx_mr(state)
@@ -1978,38 +2003,6 @@ def main():
             alerts.extend(sx_alerts)
         except Exception as ex:
             lines.append(f'SPX-MR  ОШИБКА: {str(ex)[:60]}')
-        try:
-            e4_lines, e4_alerts = scan_eth_4h(state)
-            lines.extend(e4_lines); alerts.extend(e4_alerts)
-        except Exception as ex:
-            lines.append(f'ETH-4H  ОШИБКА: {str(ex)[:60]}')
-        try:
-            bd_lines, bd_alerts = scan_btc_daily(state)
-            lines.extend(bd_lines); alerts.extend(bd_alerts)
-        except Exception as ex:
-            lines.append(f'BTC-1D  ОШИБКА: {str(ex)[:60]}')
-        try:
-            b4_lines, b4_alerts = scan_btc_4h(state)
-            lines.extend(b4_lines); alerts.extend(b4_alerts)
-        except Exception as ex:
-            lines.append(f'BTC-4H  ОШИБКА: {str(ex)[:60]}')
-        try:
-            gd_lines, gd_alerts = scan_gold_daily(state)
-            lines.extend(gd_lines); alerts.extend(gd_alerts)
-        except Exception as ex:
-            lines.append(f'GOLD-D1 ОШИБКА: {str(ex)[:60]}')
-        try:
-            g4_lines, g4_alerts = scan_gold_donch(state)
-            lines.extend(g4_lines)
-            alerts.extend(g4_alerts)
-        except Exception as ex:
-            lines.append(f'GOLD-4H ОШИБКА: {str(ex)[:60]}')
-    try:
-        sw_lines, sw_alerts = scan_btc4h_sweep(state)
-        lines.extend(sw_lines)
-        alerts.extend(sw_alerts)
-    except Exception as ex:
-        lines.append(f'BTC-SWP ОШИБКА: {str(ex)[:60]}')
     try:
         lo_lines, lo_alerts = scan_lottery(state)
         lines.extend(lo_lines)

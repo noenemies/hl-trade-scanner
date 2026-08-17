@@ -907,5 +907,32 @@
   "closed_ts": 1786969993.032151,
   "r": 0.51,
   "reason": "spxmr"
+ },
+ {
+  "coin": "BTC-BOS",
+  "side": "short",
+  "entry": 64030.0,
+  "opened_ts": 1786377600,
+  "closed_ts": 1786997016.267119,
+  "r": -0.2,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "BTC-MOM",
+  "side": "short",
+  "entry": 63417.0,
+  "opened_ts": 1786550400,
+  "closed_ts": 1786997016.268104,
+  "r": -0.85,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "BTC-DONCH",
+  "side": "short",
+  "entry": 63584.0,
+  "opened_ts": 1786449600,
+  "closed_ts": 1786997016.268948,
+  "r": -0.55,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
  }
 ]

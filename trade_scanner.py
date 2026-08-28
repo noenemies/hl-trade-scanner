@@ -825,15 +825,10 @@ def scan_gold_donch(state):
         pos = state.get('goldd')
         if pos:
             d = pos['d']
-            if (d==1 and c>pos.get('best',pos['entry'])) or (d==-1 and c<pos.get('best',pos['entry'])):
-                pos['best']=c
-                ns = c - GOLDD_TRAIL*a if d==1 else c + GOLDD_TRAIL*a
-                if (d==1 and ns>pos['stop']) or (d==-1 and ns<pos['stop']):
-                    pos['stop']=ns; key='goldd:trail'
-                    if state.get(key)!=round(ns,1):
-                        alerts.append((key,round(ns,1),f"🔁 GOLD-D: передвинь стоп на {ns:.1f} (цена {c:.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+            # ПОРЯДОК КАК В БЭКТЕСТЕ: стоп проверяется уровнем ИЗ ПРОШЛОГО бара и по low/high,
+            # трейлинг подтягивается только если позиция выжила (см. ветку else ниже).
+            hit=(l<=pos['stop']) if d==1 else (h>=pos['stop'])
             r_now=(c-pos['entry'])/pos['risk']*d
-            hit=(c<=pos['stop']) if d==1 else (c>=pos['stop'])
             tstop = t-pos['entry_ts'] >= GOLDD_TSTOP*14400
             if hit or tstop:
                 reason='трейлинг-стоп' if hit else 'тайм-стоп 60 баров'
@@ -842,6 +837,13 @@ def scan_gold_donch(state):
                 alerts.append(('goldd:close',pos['entry_ts'],f"🔚 GOLD-D ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
                 lines.append(f"GOLD-D закрыт ({reason}): {r_fin:+.2f}R"); state['goldd']=None
             else:
+                if (d==1 and c>pos.get('best',pos['entry'])) or (d==-1 and c<pos.get('best',pos['entry'])):
+                    pos['best']=c
+                    ns = c - GOLDD_TRAIL*a if d==1 else c + GOLDD_TRAIL*a
+                    if (d==1 and ns>pos['stop']) or (d==-1 and ns<pos['stop']):
+                        pos['stop']=ns; tk='goldd:trail'
+                        if state.get(tk)!=round(ns,1):
+                            alerts.append((tk,round(ns,1),f"🔁 GOLD-D: передвинь стоп на {ns:.1f} (цена {c:.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                 lines.append(f"GOLD-D в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:.1f}")
         else:
             if adx_now < GOLDD_ADX:
@@ -886,16 +888,11 @@ def scan_gold_daily(state):
             pos = state.get(key)
             if pos:
                 d = pos['d']
-                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
-                    pos['best'] = c
-                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
-                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
-                        pos['stop'] = ns; tk = f'{key}:trail'
-                        if state.get(tk) != round(ns, 1):
-                            alerts.append((tk, round(ns, 1),
-                                f"🔁 {name}: передвинь стоп на {ns:.1f} (цена {c:.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                # ПОРЯДОК КАК В БЭКТЕСТЕ: стоп проверяется уровнем ИЗ ПРОШЛОГО бара.
+                # Трейлинг подтягивается ниже, только если позиция выжила - иначе стоп
+                # поднимался бы по close и сверялся с low того же бара (look-ahead).
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= 40*86400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else 'тайм-стоп 40 дней'
@@ -906,6 +903,14 @@ def scan_gold_daily(state):
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
                     lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
                 else:
+                    if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                        pos['best'] = c
+                        ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                        if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                            pos['stop'] = ns; tk = f'{key}:trail'
+                            if state.get(tk) != round(ns, 1):
+                                alerts.append((tk, round(ns, 1),
+                                    f"🔁 {name}: передвинь стоп на {ns:.1f} (цена {c:.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                     lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:.1f}")
             else:
                 if adx_now < cfg['adx']:
@@ -979,16 +984,11 @@ def scan_btc_4h(state):
             pos = state.get(key)
             if pos:
                 d = pos['d']
-                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
-                    pos['best'] = c
-                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
-                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
-                        pos['stop'] = ns; tk = f'{key}:trail'
-                        if state.get(tk) != round(ns, 0):
-                            alerts.append((tk, round(ns, 0),
-                                f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                # ПОРЯДОК КАК В БЭКТЕСТЕ: стоп проверяется уровнем ИЗ ПРОШЛОГО бара.
+                # Трейлинг подтягивается ниже, только если позиция выжила - иначе стоп
+                # поднимался бы по close и сверялся с low того же бара (look-ahead).
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= cfg['tstop']*14400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} баров"
@@ -999,6 +999,14 @@ def scan_btc_4h(state):
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
                     lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
                 else:
+                    if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                        pos['best'] = c
+                        ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                        if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                            pos['stop'] = ns; tk = f'{key}:trail'
+                            if state.get(tk) != round(ns, 0):
+                                alerts.append((tk, round(ns, 0),
+                                    f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                     lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
             else:
                 d = _btc_signal(cfg, bars, adx_now)
@@ -1068,16 +1076,11 @@ def scan_btc_daily(state):
             pos = state.get(key)
             if pos:
                 d = pos['d']
-                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
-                    pos['best'] = c
-                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
-                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
-                        pos['stop'] = ns; tk = f'{key}:trail'
-                        if state.get(tk) != round(ns, 0):
-                            alerts.append((tk, round(ns, 0),
-                                f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                # ПОРЯДОК КАК В БЭКТЕСТЕ: стоп проверяется уровнем ИЗ ПРОШЛОГО бара.
+                # Трейлинг подтягивается ниже, только если позиция выжила - иначе стоп
+                # поднимался бы по close и сверялся с low того же бара (look-ahead).
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= cfg['tstop']*86400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} дней"
@@ -1088,6 +1091,14 @@ def scan_btc_daily(state):
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
                     lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
                 else:
+                    if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                        pos['best'] = c
+                        ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                        if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                            pos['stop'] = ns; tk = f'{key}:trail'
+                            if state.get(tk) != round(ns, 0):
+                                alerts.append((tk, round(ns, 0),
+                                    f"🔁 {name}: передвинь стоп на {ns:,.0f} (цена {c:,.0f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                     lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
             else:
                 d = _btc1d_signal(cfg, bars)
@@ -1136,16 +1147,11 @@ def scan_eth_4h(state):
             pos = state.get(key)
             if pos:
                 d = pos['d']
-                if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
-                    pos['best'] = c
-                    ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
-                    if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
-                        pos['stop'] = ns; tk = f'{key}:trail'
-                        if state.get(tk) != round(ns, 1):
-                            alerts.append((tk, round(ns, 1),
-                                f"🔁 {name}: передвинь стоп на {ns:,.1f} (цена {c:,.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
+                # ПОРЯДОК КАК В БЭКТЕСТЕ: стоп проверяется уровнем ИЗ ПРОШЛОГО бара.
+                # Трейлинг подтягивается ниже, только если позиция выжила - иначе стоп
+                # поднимался бы по close и сверялся с low того же бара (look-ahead).
+                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])
                 r_now = (c - pos['entry'])/pos['risk']*d
-                hit = (l <= pos['stop']) if d == 1 else (h >= pos['stop'])  # внутрибарно, как в бэктесте
                 tstop = t - pos['entry_ts'] >= cfg['tstop']*14400
                 if hit or tstop:
                     reason = 'трейлинг-стоп' if hit else f"тайм-стоп {cfg['tstop']} баров"
@@ -1156,6 +1162,14 @@ def scan_eth_4h(state):
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
                     lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
                 else:
+                    if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
+                        pos['best'] = c
+                        ns = c - cfg['trail']*a if d == 1 else c + cfg['trail']*a
+                        if (d == 1 and ns > pos['stop']) or (d == -1 and ns < pos['stop']):
+                            pos['stop'] = ns; tk = f'{key}:trail'
+                            if state.get(tk) != round(ns, 1):
+                                alerts.append((tk, round(ns, 1),
+                                    f"🔁 {name}: передвинь стоп на {ns:,.1f} (цена {c:,.1f}, {(c-pos['entry'])/pos['risk']*d:+.1f}R)"))
                     lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.1f}")
             else:
                 lk = cfg['look']; d = 0
@@ -1198,58 +1212,6 @@ SPX_MR2 = {
     'SPX-DIP5':  dict(kind='dip',  pct=0.05, look=20, rr=2.0, stop=2.0, tstop=15),  # PF 1.94 OOS 1.94, 5/6
     'SPX-TOM':   dict(kind='tom',  rr=None, stop=2.0, tstop=5),          # PF 1.33 OOS 1.23, 6/6, N=669
 }
-
-# NASDAQ: поиск на 40.8 годах NDX (1985-2026) -> 4 робастных из 68; трендследящие снова 0.
-# Победитель выбран КРОСС-ВАЛИДАЦИЕЙ на трёх индексах (NDX / Composite 55 лет / S&P 56 лет):
-#   IBS<0.05: NDX PF 1.42 OOS 1.67 (5/5 дес) | IXIC 1.71/1.77 (5/5) | SPX 1.52/1.51 (5/6)
-#   единственная, стабильная на ВСЕХ трёх -> не подгонка под один индекс.
-# IBS = положение закрытия внутри дневного диапазона; <0.05 = закрытие у самого минимума дня.
-NDX_MR = {'NDX-IBS': dict(th=0.05, rr=1.5, stop=2.0, tstop=10)}
-
-
-def scan_ndx_mr(state):
-    """NASDAQ mean-reversion: закрытие у минимума дня в бычьем режиме. ТОЛЬКО ЛОНГИ."""
-    lines, alerts = [], []
-    try:
-        bars = fetch_bars('^NDX', days=700, interval='1d', bar_sec=86400)
-        if len(bars) < 220:
-            return ['NDX-MR  нет данных'], []
-        C = [b[4] for b in bars]
-        a = atr(bars)[-1]; t, o, h, l, c = bars[-1][:5]
-        s200 = sum(C[-200:]) / 200
-        ibs = (c - l) / (h - l) if h > l else 0.5
-        for name, cfg in NDX_MR.items():
-            key = f'ndxmr_{name}'
-            pos = state.get(key)
-            if pos:
-                r_now = (c - pos['entry']) / pos['risk']
-                hit = l <= pos['stop']
-                tp_hit = h >= pos['entry'] + cfg['rr'] * pos['risk']
-                tstop = (t - pos['entry_ts']) >= cfg['tstop'] * 86400
-                if hit or tp_hit or tstop:
-                    reason = 'стоп' if hit else (f"тейк {cfg['rr']}R" if tp_hit else f"тайм-стоп {cfg['tstop']}д")
-                    r_fin = -1.0 if hit else (cfg['rr'] if tp_hit else r_now)
-                    journal_trade(name, {'side': 'long', 'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
-                    alerts.append((f'{key}:close', pos['entry_ts'],
-                        f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой лонг, если ещё в рынке."))
-                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
-                else:
-                    lines.append(f"{name} в лонге {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
-            else:
-                if ibs < cfg['th'] and c > s200:
-                    risk = cfg['stop'] * a
-                    state[key] = {'entry': c, 'stop': c - risk, 'risk': risk, 'entry_ts': t}
-                    alerts.append((f'{key}:entry', t,
-                        f"📉 {name} ЛОНГ (закрытие у минимума дня, IBS {ibs:.2f}, выше SMA200): "
-                        f"вход ~{c:,.0f}, стоп {c-risk:,.0f}, тейк {c+cfg['rr']*risk:,.0f} ({cfg['rr']}R). "
-                        f"Риск 0.2% [кросс-валидация на 3 индексах, 40-55 лет]"))
-                    lines.append(f"{name} >>> ЛОНГ вход ~{c:,.0f}")
-                else:
-                    lines.append(f"{name} нет сигнала (IBS {ibs:.2f}, нужно <{cfg['th']})")
-    except Exception as ex:
-        lines.append(f'NDX-MR  ОШИБКА: {str(ex)[:60]}')
-    return lines, alerts
-
 
 def scan_spx_mr2(state):
     """Три MR-стратегии S&P500 на дневках. ТОЛЬКО ЛОНГИ (шорты на индексе не работают)."""
@@ -1987,11 +1949,6 @@ def main():
     except Exception as ex:
         lines.append(f'GOLD-4H ОШИБКА: {str(ex)[:60]}')
     if not btc_only:
-        try:
-            nm_lines, nm_alerts = scan_ndx_mr(state)
-            lines.extend(nm_lines); alerts.extend(nm_alerts)
-        except Exception as ex:
-            lines.append(f'NDX-MR  ОШИБКА: {str(ex)[:60]}')
         try:
             s2_lines, s2_alerts = scan_spx_mr2(state)
             lines.extend(s2_lines); alerts.extend(s2_alerts)

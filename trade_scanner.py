@@ -274,6 +274,14 @@ def journal_trade(coin, pos, r, reason):
         j = json.load(open(JOURNAL)) if JOURNAL.exists() else []
     except Exception:
         j = []
+    # ЗАЩИТА ОТ ДУБЛЕЙ: если состояние в облаке откатилось (провал git push /
+    # конфликт ребейза), модуль увидит позицию открытой и закроет её повторно.
+    # Сделка уникальна по (модуль, цена входа, бар входа) - второй раз не пишем.
+    ident = (coin, round(pos['entry'], 4), int(pos['entry_ts']))
+    for old in j:
+        if (old.get('coin'), round(old.get('entry', 0), 4),
+                int(old.get('opened_ts', 0))) == ident:
+            return
     j.append({'coin': coin, 'side': pos['side'], 'entry': pos['entry'],
               'opened_ts': pos['entry_ts'], 'closed_ts': dt.datetime.now().timestamp(),
               'r': round(r, 2), 'reason': reason})
@@ -819,7 +827,7 @@ def scan_gold_donch(state):
         bars = fetch_hl_bars('xyz:GOLD', '4h', days=45)
         if len(bars) < GOLDD_LOOK+30:
             return ['GOLD-D  нет данных'], []
-        a = atr(bars); adx_now = _adx(bars)
+        a = atr(bars)[-1]; adx_now = _adx(bars)
         t,o,h,l,c = bars[-1][:5]
         hh = max(b[2] for b in bars[-GOLDD_LOOK-1:-1]); ll = min(b[3] for b in bars[-GOLDD_LOOK-1:-1])
         pos = state.get('goldd')
@@ -881,7 +889,7 @@ def scan_gold_daily(state):
         bars = fetch_hl_bars('xyz:GOLD', '1d', days=650, bar_sec=86400)
         if len(bars) < 80:
             return ['GOLD-D1 нет данных'], []
-        a = atr(bars); adx_now = _adx(bars)
+        a = atr(bars)[-1]; adx_now = _adx(bars)
         t, o, h, l, c = bars[-1][:5]
         for name, cfg in GOLD_D1.items():
             key = f'gd_{name}'

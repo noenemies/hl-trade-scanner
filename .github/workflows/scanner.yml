@@ -25,11 +25,26 @@ jobs:
           git config user.email "scanner@local"
           for i in $(seq 1 10); do
             echo "--- итерация $i: $(date) ---"
-            git pull --rebase origin main || true
+            # Синхронизация состояния. Раньше здесь был `git pull --rebase || true`:
+            # при конфликте по scanner_state.json репозиторий оставался в недоделанном
+            # ребейзе, прогон шёл на СТАРОМ состоянии, позиция "открывалась" заново и
+            # сделка писалась в журнал повторно (отсюда дубли и неверные R в отчёте).
+            git rebase --abort 2>/dev/null || true
+            git fetch -q origin main && git reset -q --hard origin/main
             python3 trade_scanner.py --auto --quiet || true
             git add -A -- '*.json' signals.log 2>/dev/null || true
-            if git commit -m "state $(date -u +%F_%H%M)"; then
-              git push origin main || (git pull --rebase origin main && git push origin main) || true
+            if git commit -qm "state $(date -u +%F_%H%M)"; then
+              pushed=""
+              for try in 1 2 3; do
+                if git push -q origin main; then pushed=ok; break; fi
+                # Нас опередили. Состояние только что отработавшего прогона свежее,
+                # поэтому переносим коммит поверх удалённого, не теряя свои файлы.
+                git fetch -q origin main
+                git reset -q --soft origin/main
+                git add -A -- '*.json' signals.log 2>/dev/null || true
+                git commit -qm "state $(date -u +%F_%H%M) retry$try" || true
+              done
+              [ -z "$pushed" ] && echo "ВНИМАНИЕ: состояние НЕ запушено на итерации $i"
             fi
             [ "$i" -lt 10 ] && sleep 1680
           done

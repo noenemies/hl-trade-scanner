@@ -1222,5 +1222,23 @@
   "closed_ts": 1788365160.414487,
   "r": -0.92,
   "reason": "stop"
+ },
+ {
+  "coin": "ETH-VOL",
+  "side": "short",
+  "entry": 2382.0,
+  "opened_ts": 1788336000,
+  "closed_ts": 1788452756.11769,
+  "r": -1.0,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH-DONCH",
+  "side": "short",
+  "entry": 2382.0,
+  "opened_ts": 1788336000,
+  "closed_ts": 1788452756.118997,
+  "r": -1.0,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
  }
 ]

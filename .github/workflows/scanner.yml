@@ -44,7 +44,11 @@ jobs:
                 git add -A -- '*.json' signals.log 2>/dev/null || true
                 git commit -qm "state $(date -u +%F_%H%M) retry$try" || true
               done
-              [ -z "$pushed" ] && echo "ВНИМАНИЕ: состояние НЕ запушено на итерации $i"
+              if [ -z "$pushed" ]; then echo "ВНИМАНИЕ: состояние НЕ запушено на итерации $i"; fi
             fi
-            [ "$i" -lt 10 ] && sleep 1680
+            # ВАЖНО: через `[ $i -lt 10 ] && sleep` нельзя - на последней итерации
+            # условие ложно, весь список возвращает 1, это же и есть код выхода
+            # скрипта, и GitHub помечает прогон упавшим (отсюда письма о сбое).
+            if [ "$i" -lt 10 ]; then sleep 1680; fi
           done
+          echo "цепочка завершена штатно"

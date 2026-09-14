@@ -276,12 +276,12 @@ def journal_trade(coin, pos, r, reason):
         j = []
     # ЗАЩИТА ОТ ДУБЛЕЙ: если состояние в облаке откатилось (провал git push /
     # конфликт ребейза), модуль увидит позицию открытой и закроет её повторно.
-    # Сделка уникальна по (модуль, цена входа, бар входа) - второй раз не пишем.
+    # Сделка уникальна по (модуль, цена входа, бар входа). Старую запись не
+    # пропускаем, а ЗАМЕНЯЕМ: последнее закрытие - настоящее, т.к. позиция,
+    # прожившая дольше, закрылась позже. Пропуск терял бы реальный результат.
     ident = (coin, round(pos['entry'], 4), int(pos['entry_ts']))
-    for old in j:
-        if (old.get('coin'), round(old.get('entry', 0), 4),
-                int(old.get('opened_ts', 0))) == ident:
-            return
+    j = [x for x in j if (x.get('coin'), round(x.get('entry', 0), 4),
+                          int(x.get('opened_ts', 0))) != ident]
     j.append({'coin': coin, 'side': pos['side'], 'entry': pos['entry'],
               'opened_ts': pos['entry_ts'], 'closed_ts': dt.datetime.now().timestamp(),
               'r': round(r, 2), 'reason': reason})
@@ -909,7 +909,12 @@ def scan_gold_daily(state):
                                          'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
                     alerts.append((f'{key}:close', pos['entry_ts'],
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
-                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R")
+                    # Помним бар выхода: на нём повторный вход запрещён. Иначе модуль,
+                    # переоценивая тот же последний закрытый бар через 28 минут, снова
+                    # видит сигнал и открывается по той же цене с тем же entry_ts.
+                    # В бэктесте после выхода всегда идёт СЛЕДУЮЩИЙ бар.
+                    state[key] = None; state[f'{key}:exit_bar'] = t
                 else:
                     if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
                         pos['best'] = c
@@ -927,7 +932,7 @@ def scan_gold_daily(state):
                 lk = cfg['look']
                 hh = max(b[2] for b in bars[-lk-1:-1]); ll = min(b[3] for b in bars[-lk-1:-1])
                 d = 1 if c > hh else (-1 if c < ll else 0)
-                if d:
+                if d and t > state.get(f'{key}:exit_bar', 0):
                     risk = cfg['stop']*a
                     state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
                     side = 'ЛОНГ' if d == 1 else 'ШОРТ'
@@ -1005,7 +1010,12 @@ def scan_btc_4h(state):
                                          'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
                     alerts.append((f'{key}:close', pos['entry_ts'],
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
-                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R")
+                    # Помним бар выхода: на нём повторный вход запрещён. Иначе модуль,
+                    # переоценивая тот же последний закрытый бар через 28 минут, снова
+                    # видит сигнал и открывается по той же цене с тем же entry_ts.
+                    # В бэктесте после выхода всегда идёт СЛЕДУЮЩИЙ бар.
+                    state[key] = None; state[f'{key}:exit_bar'] = t
                 else:
                     if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
                         pos['best'] = c
@@ -1018,7 +1028,7 @@ def scan_btc_4h(state):
                     lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
             else:
                 d = _btc_signal(cfg, bars, adx_now)
-                if d:
+                if d and t > state.get(f'{key}:exit_bar', 0):
                     risk = cfg['stop']*a
                     state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
                     side = 'ЛОНГ' if d == 1 else 'ШОРТ'
@@ -1097,7 +1107,12 @@ def scan_btc_daily(state):
                                          'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
                     alerts.append((f'{key}:close', pos['entry_ts'],
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
-                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R")
+                    # Помним бар выхода: на нём повторный вход запрещён. Иначе модуль,
+                    # переоценивая тот же последний закрытый бар через 28 минут, снова
+                    # видит сигнал и открывается по той же цене с тем же entry_ts.
+                    # В бэктесте после выхода всегда идёт СЛЕДУЮЩИЙ бар.
+                    state[key] = None; state[f'{key}:exit_bar'] = t
                 else:
                     if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
                         pos['best'] = c
@@ -1110,7 +1125,7 @@ def scan_btc_daily(state):
                     lines.append(f"{name} в {'лонге' if d==1 else 'шорте'} {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
             else:
                 d = _btc1d_signal(cfg, bars)
-                if d:
+                if d and t > state.get(f'{key}:exit_bar', 0):
                     risk = cfg['stop']*a
                     state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
                     side = 'ЛОНГ' if d == 1 else 'ШОРТ'
@@ -1168,7 +1183,12 @@ def scan_eth_4h(state):
                                          'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
                     alerts.append((f'{key}:close', pos['entry_ts'],
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой, если ещё в рынке."))
-                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R")
+                    # Помним бар выхода: на нём повторный вход запрещён. Иначе модуль,
+                    # переоценивая тот же последний закрытый бар через 28 минут, снова
+                    # видит сигнал и открывается по той же цене с тем же entry_ts.
+                    # В бэктесте после выхода всегда идёт СЛЕДУЮЩИЙ бар.
+                    state[key] = None; state[f'{key}:exit_bar'] = t
                 else:
                     if (d == 1 and c > pos.get('best', pos['entry'])) or (d == -1 and c < pos.get('best', pos['entry'])):
                         pos['best'] = c
@@ -1195,7 +1215,7 @@ def scan_eth_4h(state):
                     else:
                         if C[i] > max(H[i-lk:i]): d = 1
                         elif C[i] < min(L[i-lk:i]): d = -1
-                if d:
+                if d and t > state.get(f'{key}:exit_bar', 0):
                     risk = cfg['stop']*a
                     state[key] = {'d': d, 'entry': c, 'stop': c-d*risk, 'best': c, 'risk': risk, 'entry_ts': t}
                     side = 'ЛОНГ' if d == 1 else 'ШОРТ'
@@ -1250,7 +1270,12 @@ def scan_spx_mr2(state):
                     journal_trade(name, {'side': 'long', 'entry': pos['entry'], 'entry_ts': pos['entry_ts']}, r_fin, reason)
                     alerts.append((f'{key}:close', pos['entry_ts'],
                         f"🔚 {name} ЗАКРЫТ ({reason}): {r_fin:+.2f}R. Закрой лонг, если ещё в рынке."))
-                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R"); state[key] = None
+                    lines.append(f"{name} закрыт ({reason}): {r_fin:+.2f}R")
+                    # Помним бар выхода: на нём повторный вход запрещён. Иначе модуль,
+                    # переоценивая тот же последний закрытый бар через 28 минут, снова
+                    # видит сигнал и открывается по той же цене с тем же entry_ts.
+                    # В бэктесте после выхода всегда идёт СЛЕДУЮЩИЙ бар.
+                    state[key] = None; state[f'{key}:exit_bar'] = t
                 else:
                     lines.append(f"{name} в лонге {r_now:+.1f}R, стоп {pos['stop']:,.0f}")
             else:
@@ -1264,7 +1289,7 @@ def scan_spx_mr2(state):
                     nxt = d_now + _dt.timedelta(days=1)
                     while nxt.weekday() >= 5: nxt += _dt.timedelta(days=1)
                     if nxt.month != d_now.month: sig = 1
-                if sig:
+                if sig and t > state.get(f'{key}:exit_bar', 0):
                     risk = cfg['stop'] * a
                     state[key] = {'entry': c, 'stop': c - risk, 'risk': risk, 'entry_ts': t}
                     kindru = {'rsi': f"RSI2<{cfg.get('th')} выше EMA200",

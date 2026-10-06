@@ -1681,5 +1681,14 @@
   "closed_ts": 1791177297.622616,
   "r": -1.0,
   "reason": "stop"
+ },
+ {
+  "coin": "SP500",
+  "side": "long",
+  "entry": 7719.5,
+  "opened_ts": 1790864307.0485,
+  "closed_ts": 1791289858.084279,
+  "r": 0.54,
+  "reason": "spxmr"
  }
 ]

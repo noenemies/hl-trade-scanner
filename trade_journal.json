@@ -2149,5 +2149,14 @@
   "closed_ts": 1792759139.707701,
   "r": 0.98,
   "reason": "spxmr"
+ },
+ {
+  "coin": "ETH",
+  "side": "short",
+  "entry": 2379.7,
+  "opened_ts": 1792684800,
+  "closed_ts": 1792887391.548891,
+  "r": 0.66,
+  "reason": "stop"
  }
 ]

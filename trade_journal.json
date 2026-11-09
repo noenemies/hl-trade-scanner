@@ -2446,5 +2446,32 @@
   "closed_ts": 1793970985.358464,
   "r": 0.84,
   "reason": "spxmr"
+ },
+ {
+  "coin": "ETH-VOL",
+  "side": "short",
+  "entry": 2125.8,
+  "opened_ts": 1794168000,
+  "closed_ts": 1794184267.454765,
+  "r": -1.0,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH-MOM",
+  "side": "short",
+  "entry": 2261.2,
+  "opened_ts": 1793894400,
+  "closed_ts": 1794184267.455962,
+  "r": 0.31,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH-DONCH",
+  "side": "short",
+  "entry": 2125.8,
+  "opened_ts": 1794168000,
+  "closed_ts": 1794184267.457043,
+  "r": -1.0,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
  }
 ]

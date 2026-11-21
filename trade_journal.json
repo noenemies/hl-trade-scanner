@@ -2608,5 +2608,59 @@
   "closed_ts": 1795257767.73266,
   "r": 0.4,
   "reason": "stop"
+ },
+ {
+  "coin": "ETH-VOL",
+  "side": "short",
+  "entry": 1607.3,
+  "opened_ts": 1795190400,
+  "closed_ts": 1795283600.522775,
+  "r": -0.94,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH-MOM",
+  "side": "short",
+  "entry": 1803.5,
+  "opened_ts": 1795060800,
+  "closed_ts": 1795283600.523649,
+  "r": 1.11,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "ETH-DONCH",
+  "side": "short",
+  "entry": 1607.3,
+  "opened_ts": 1795190400,
+  "closed_ts": 1795283600.526633,
+  "r": -0.73,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "BTC-BOS",
+  "side": "short",
+  "entry": 61962.0,
+  "opened_ts": 1795118400,
+  "closed_ts": 1795283601.310745,
+  "r": 0.5,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "BTC-MOM",
+  "side": "short",
+  "entry": 65330.0,
+  "opened_ts": 1794772800,
+  "closed_ts": 1795283601.311794,
+  "r": 1.55,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "BTC-DONCH",
+  "side": "short",
+  "entry": 61962.0,
+  "opened_ts": 1795118400,
+  "closed_ts": 1795283601.312673,
+  "r": 0.4,
+  "reason": "\u0442\u0440\u0435\u0439\u043b\u0438\u043d\u0433-\u0441\u0442\u043e\u043f"
  }
 ]

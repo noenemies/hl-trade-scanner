@@ -2698,5 +2698,23 @@
   "closed_ts": 1795459055.680932,
   "r": -1.0,
   "reason": "\u0441\u0442\u043e\u043f"
+ },
+ {
+  "coin": "SP500",
+  "side": "long",
+  "entry": 7442.25,
+  "opened_ts": 1794939941.217064,
+  "closed_ts": 1795632359.521903,
+  "r": -0.84,
+  "reason": "spxmr"
+ },
+ {
+  "coin": "ETH",
+  "side": "short",
+  "entry": 1657.5,
+  "opened_ts": 1795568400,
+  "closed_ts": 1795632362.117463,
+  "r": -0.39,
+  "reason": "stop"
  }
 ]
